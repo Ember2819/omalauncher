@@ -24,15 +24,15 @@ private fun agentCommand(
 private fun OwlKind.what() =
     when (this) {
         OwlKind.Widget -> "a home-screen widget (widget \"name\" { }, a tile on my home screen)"
-        OwlKind.Face -> "a face (face \"name\" { }: a whole page of my home screen, the whole screen, as README.md's Faces section says)"
-        OwlKind.App -> "an app (app \"name\" { }: it shows up in my app drawer and opens full screen; give it an icon: as README.md's Apps section says)"
+        OwlKind.Face -> "a face (face \"name\" { }: a whole page of my home screen, the whole screen, as docs/faces.md says)"
+        OwlKind.App -> "an app (app \"name\" { }: it shows up in my app drawer and opens full screen; give it an icon: as docs/apps.md says)"
         OwlKind.Panel ->
             "a panel (panel \"name\" { }: swiping up on my home screen opens it as my app drawer, or swiping down opens it from the top, " +
-                "as README.md's Panels section says). Ask me which swipe it's for, and once it works, pick it for that swipe by setting " +
+                "as docs/panels.md says). Ask me which swipe it's for, and once it works, pick it for that swipe by setting " +
                 "gestures.swipe-up or gestures.swipe-down to its file name in ~/${StyleStore.GUEST_DIR}/style.toml"
         OwlKind.Keys ->
-            "extra keys (keybar \"name\" { }: the bar over the soft keyboard while I type in a terminal, as README.md's Extra keys " +
-                "section says). The launcher shows ${WidgetEngine.KEYS}, so change that file rather than making a new one"
+            "extra keys (keybar \"name\" { }: the bar over the soft keyboard while I type in a terminal, as docs/keybar.md " +
+                "says). The launcher shows ${WidgetEngine.KEYS}, so change that file rather than making a new one"
     }
 
 /** A session in the widgets dir that creates an owl file of [kind]; a face for the empty [page] left of page 1, if given. */
@@ -86,7 +86,7 @@ fun publishWidgetCommand(
             OwlKind.Face -> "face" to "the face as faces/<my GitHub username in lowercase>/<a short name>/face.owl, with the preview.png owl-check points to next to it"
             OwlKind.App ->
                 "app" to "the app as apps/<my GitHub username in lowercase>/<a short name>/app.owl (not a name a widget there has), " +
-                    "with the screen picture owl-check points to next to it as preview.png. It needs an icon: (see README.md's Apps section)"
+                    "with the screen picture owl-check points to next to it as preview.png. It needs an icon: (see docs/apps.md)"
             OwlKind.Panel -> "panel" to "the panel as panels/<my GitHub username in lowercase>/<a short name>/panel.owl, with the screen picture owl-check points to next to it as preview.png"
             OwlKind.Keys -> "extra keys" to "the keys as keybars/<my GitHub username in lowercase>/<a short name>/keybar.owl, with the screen picture owl-check points to next to it as preview.png"
         }

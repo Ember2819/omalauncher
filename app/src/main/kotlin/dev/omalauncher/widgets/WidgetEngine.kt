@@ -984,6 +984,7 @@ class WidgetEngine(
         val assets = context.assets
         return buildList {
             add(asset("widgets/README.md", File(dir, "README.md"), Policy.Owned))
+            for (name in assets.list("widgets/docs").orEmpty()) add(asset("widgets/docs/$name", File(dir, "docs/$name"), Policy.Owned))
             for (name in assets.list("widgets/examples").orEmpty()) add(asset("widgets/examples/$name", File(dir, "examples/$name"), Policy.Seeded))
             for (name in assets.list("widgets").orEmpty().filter { it.endsWith(".owl") }) add(asset("widgets/$name", File(dir, name), Policy.Seeded))
             // Always as this launcher ships them, whatever became of drawer.owl and keybar.owl.
@@ -1031,7 +1032,7 @@ class WidgetEngine(
 
         private const val AGENT_POINTER =
             "# omalauncher\n\nThis Arch system runs inside an Android launcher. Home-screen widgets are `.owl` files in " +
-                "~/$GUEST_DIR, written in a small declarative language documented in README.md there; so are apps for the " +
+                "~/$GUEST_DIR, written in a small declarative language documented in README.md there (and docs/ next to it); so are apps for the " +
                 "app drawer (`app \"name\" { }`) and panels that swiping up or down on home opens (`panel \"name\" { }`, picked with " +
                 "gestures.swipe-up and gestures.swipe-down in ~/${StyleStore.GUEST_DIR}/style.toml). The app drawer is the panel " +
                 "drawer.owl there: to change the drawer, edit it; .stock-drawer.owl is the drawer as this launcher ships it. " +
@@ -1046,6 +1047,6 @@ class WidgetEngine(
                 "setting with its default and range. Changes show within a second; ${StyleStore.ERRORS} there says what was ignored and why.\n\n" +
                 "Where everything on home is (pages in order, faces, widgets, pinned apps and folders, each tile's cell) is " +
                 "~/${HomeStore.GUEST_DIR}/${HomeStore.FILE}; edit it to move, resize or pin things or reorder pages. " +
-                "\"Home's layout\" in the widgets README explains it.\n"
+                "docs/home.md in the widgets folder explains it.\n"
     }
 }
