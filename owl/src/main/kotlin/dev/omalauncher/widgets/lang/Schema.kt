@@ -122,7 +122,15 @@ internal val SINCE =
         // owl 12: how much of an app's top a camera cutout covers, once it hides the status bar.
         mapOf("screenTop" to 12) +
         // owl 12: the extra keys over the soft keyboard as a file; keys for the focused Linux window; touches as they go down.
-        listOf(KEYS_FILE, "pressKey", "typeText", "latch", "android.modifiers", "onPress", "onRelease", "repeats").associateWith { 12 }
+        listOf(KEYS_FILE, "pressKey", "typeText", "latch", "android.modifiers", "onPress", "onRelease", "repeats").associateWith { 12 } +
+        // owl 12: requests other than POST; base64 text.
+        listOf(POST_METHOD, "toBase64", "fromBase64").associateWith { 12 }
+
+/** `method:` on post(...), named like this in [SINCE]. */
+internal const val POST_METHOD = "method:"
+
+/** The methods post(...) sends; Android's HttpURLConnection has no PATCH. */
+internal val POST_METHODS = setOf("POST", "PUT", "DELETE")
 
 internal const val FACE_FILE = "face \"…\" { }"
 

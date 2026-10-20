@@ -588,6 +588,7 @@ class WidgetServices(
         headers: Map<String, String>,
         timeoutSeconds: Int,
         body: ByteArray?,
+        method: String,
     ): ShellResult =
         withContext(Dispatchers.IO) {
             if (!url.startsWith("https://") && !url.startsWith("http://")) return@withContext ShellResult("", "not an http(s) URL: $url", -1)
@@ -597,10 +598,13 @@ class WidgetServices(
                     connection.setRequestProperty("User-Agent", "omalauncher-widgets")
                     headers.forEach { (k, v) -> connection.setRequestProperty(k, v) }
                     if (body != null) {
-                        connection.requestMethod = "POST"
-                        connection.doOutput = true
-                        connection.setFixedLengthStreamingMode(body.size)
-                        connection.outputStream.use { it.write(body) }
+                        connection.requestMethod = method
+                        // A DELETE usually has no body, and some servers refuse one.
+                        if (method != "DELETE" || body.isNotEmpty()) {
+                            connection.doOutput = true
+                            connection.setFixedLengthStreamingMode(body.size)
+                            connection.outputStream.use { it.write(body) }
+                        }
                     }
                     val code = connection.responseCode
                     val stream = if (code >= 400) connection.errorStream else connection.inputStream

@@ -60,8 +60,9 @@ class LangTest {
             body: Value,
             headers: Map<String, String>,
             slot: Int?,
+            method: String,
         ) {
-            actions += "post $slot $url $body $headers"
+            actions += "post $slot $url $body $headers" + (if (method != "POST") " $method" else "")
         }
     }
 
@@ -289,6 +290,32 @@ class LangTest {
         assertTrue(compileError("widget {\n meta { owl: 7 }\n onTap: post(\"https://x.test/\")\n Text { text: 1 } }").contains("post needs owl 8"))
         assertTrue(compileError("app \"t\" {\n meta { owl: 8 }\n back: true\n onBack: post(\"file:///x\")\n Text { text: 1 } }").contains("http:// or https://"))
         assertEquals(listOf("http POST (a URL built from widget values)"), Compiler.compile("app \"t\" {\n meta { owl: 8 }\n state u = \"\"\n back: true\n onBack: post(u)\n Text { text: 1 } }").commands)
+    }
+
+    /** post's method: sends PUT or DELETE (owl 12), listed as what it is. */
+    @Test fun postMethods() {
+        val p =
+            Compiler.compile(
+                "app \"t\" {\n meta { owl: 12 }\n back: true\n" +
+                    " onBack: { post(\"https://x.test/items/1\", null, {}, method: \"delete\"); post(\"https://x.test/b\", {a: 1}, {}, method: \"PUT\") }\n" +
+                    " Text { text: 1 } }",
+            )
+        val host = TestHost(p)
+        p.onBack!!.run(Env.root(host), emptyList())
+        assertEquals(listOf("post null https://x.test/items/1 null {} DELETE", "post null https://x.test/b {a: 1} {} PUT"), host.actions)
+        assertEquals(setOf("http DELETE https://x.test/items/1", "http PUT https://x.test/b"), p.commands.toSet())
+        val app = "app \"t\" {\n meta { owl: 12 }\n back: true\n onBack: post(\"https://x.test/\", null, {}, "
+        assertTrue(compileError("app \"t\" {\n meta { owl: 11 }\n back: true\n onBack: post(\"https://x.test/\", null, {}, method: \"PUT\")\n Text { text: 1 } }").contains("needs owl 12"))
+        assertTrue(compileError(app + "method: \"PATCH\")\n Text { text: 1 } }").contains("method: is one of"))
+        assertTrue(compileError(app + "retries: 3)\n Text { text: 1 } }").contains("no other named arguments"))
+    }
+
+    @Test fun base64() {
+        assertEquals("aGk/Pz4=", text("toBase64(\"hi??>\")", "meta { owl: 12 }"))
+        // base64url, unpadded, as a JWT or a link carries JSON.
+        assertEquals("hi??>", text("fromBase64(\"aGk_Pz4\")", "meta { owl: 12 }"))
+        assertEquals("pc", text("parseJson(fromBase64(\"eyJob3N0IjoicGMifQ\")).host", "meta { owl: 12 }"))
+        assertEquals("null", text("fromBase64(\"*\")", "meta { owl: 12 }"))
     }
 
     @Test fun imagesFromTheWeb() {

@@ -1046,18 +1046,26 @@ class Compiler private constructor(
 
     /**
      * `post(url, body, headers)`, or `x = post(...)` to get the answer into the state [slot]: an HTTP POST
-     * from Android. Its URLs are listed like http(...)'s, as "http POST <url>".
+     * (or `method:`'s PUT or DELETE) from Android. Its URLs are listed like http(...)'s, as "http POST <url>".
      */
     private fun post(
         call: Expr.Call,
         scope: Scope,
         slot: Int?,
     ): (Env) -> Unit {
-        if (call.args.size !in 1..3 || call.named.isNotEmpty()) fail("post(\"https://...\", body, headers) takes a URL, optionally a body and a map of headers", call.pos)
+        if (call.args.size !in 1..3) fail("post(\"https://...\", body, headers) takes a URL, optionally a body and a map of headers", call.pos)
+        for ((k, v) in call.named) if (k != "method") fail("post takes method: and no other named arguments", v.pos)
         since("post", call.pos)
         val url = ex(call.args[0], scope)
         (url.const as? Str)?.v?.let { if (!it.startsWith("https://") && !it.startsWith("http://")) fail("post takes an http:// or https:// URL", call.args[0].pos) }
-        listUrl("http POST", call.args[0], url, scope)
+        // A constant, so the reviewer reads what it does: "http DELETE https://…".
+        val method =
+            call.named.firstOrNull { it.first == "method" }?.second?.let { m ->
+                since(POST_METHOD, m.pos)
+                (constant(m, "method") as? Str)?.v?.uppercase()?.takeIf { it in POST_METHODS }
+                    ?: fail("method: is one of ${POST_METHODS.joinToString { "\"$it\"" }}", m.pos)
+            } ?: "POST"
+        listUrl("http $method", call.args[0], url, scope)
         val body = call.args.getOrNull(1)?.let { ex(it, scope) }
         val headers = call.args.getOrNull(2)?.let { ex(it, scope) }
         return { env ->
@@ -1065,7 +1073,7 @@ class Compiler private constructor(
             // Like any action whose value hasn't loaded: a null URL sends nothing.
             if (target != Null) {
                 val h = (headers?.invoke(env) as? Obj)?.fields.orEmpty().mapValues { it.value.toString() }
-                env.host.post(target.toString(), body?.invoke(env) ?: Null, h, slot)
+                env.host.post(target.toString(), body?.invoke(env) ?: Null, h, slot, method)
             }
         }
     }
