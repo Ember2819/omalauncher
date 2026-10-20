@@ -130,7 +130,7 @@ it's set. An API that takes its key in the URL gets it as `enc(key)` there, writ
 command or a notification, copying it, a trigger on it or assigning it to another state is a compile
 error. A handler may set it: `token = value` from the Input, `token = null` to sign out; `owl-send`
 can't. The server a secret goes to is written out in the URL (`"https://api.example.com/${enc(id)}"`),
-not taken from a value. Prefer a header when the API takes one: servers often log the URLs they're asked
+not taken from a value, and it's an `https://` one. Prefer a header when the API takes one: servers often log the URLs they're asked
 for.
 
 ```owl

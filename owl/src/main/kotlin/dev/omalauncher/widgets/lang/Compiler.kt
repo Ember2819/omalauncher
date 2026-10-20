@@ -63,8 +63,8 @@ class Compiler private constructor(
         /** A URL whose scheme and host are fixed text, so no value can send it elsewhere. */
         private val FIXED_HOST = Regex("""^https?://[A-Za-z0-9.-]+(:[0-9]+)?/""")
 
-        /** A URL's scheme, host and port, what a secret is bound to. */
-        private val SERVER = Regex("""^https?://[^/?#]+""")
+        /** A URL's scheme, host and port, what a secret is bound to: https, and no `user@` before the host to hide where it goes. */
+        private val SERVER = Regex("""^https://[A-Za-z0-9.-]+(:[0-9]+)?(?=[/?#]|$)""")
     }
 
     /** Compile-time mirror of an [Env] frame. Only the first [visible] names resolve (lets see earlier lets only). */
@@ -145,7 +145,11 @@ class Compiler private constructor(
         if (names.isEmpty()) return
         val written = "${names.first()} is a secret, so the server it goes to is written out: \"https://api.example.com/…\""
         if (shapes == null) fail("$written, not a value", pos)
-        val hosts = shapes.map { SERVER.find(it)?.value?.lowercase() ?: fail(written, pos) }
+        val hosts =
+            shapes.map {
+                if (it.startsWith("http://")) fail("${names.first()} is a secret, so it goes only to an https:// server, where nothing on the way can read it", pos)
+                SERVER.find(it)?.value?.lowercase() ?: fail(written, pos)
+            }
         for (n in names) secretHosts.getOrPut(n) { HashSet() } += hosts
     }
 
@@ -596,21 +600,24 @@ class Compiler private constructor(
             // A URL that's null pauses its source: no shape.
             return if (c is Str || c is Num) listOf(c.toString()) else if (c == Null && value == "enc") emptyList() else null
         }
+        // Capped at each step: "${a ? "x" : "y"}" twenty times over would otherwise be millions of strings.
+        fun capped(l: List<String>) = l.distinct().takeIf { it.size <= MAX_SHAPES }
+
         fun join(
             a: List<String>,
             b: List<String>,
-        ) = a.flatMap { x -> b.map { x + it } }
+        ) = capped(a.flatMap { x -> b.map { x + it } })
         val out =
             when (e) {
-                is Expr.Interp -> e.parts.fold(listOf("")) { acc, p -> join(acc, shapes(p, s, value) ?: return null) }
+                is Expr.Interp -> e.parts.fold(listOf("")) { acc, p -> join(acc, shapes(p, s, value) ?: return null) ?: return null }
                 is Expr.Binary -> if (e.op == "+") join(shapes(e.a, s, value) ?: return null, shapes(e.b, s, value) ?: return null) else null
-                is Expr.Cond -> (shapes(e.a, s, value) ?: return null) + (shapes(e.b, s, value) ?: return null)
+                is Expr.Cond -> capped((shapes(e.a, s, value) ?: return null) + (shapes(e.b, s, value) ?: return null))
                 is Expr.Call -> if (e.name == value) listOf(VALUE) else if (e.name in NUMBERS) listOf(NUMBER) else null
                 // A top-level let that is fixed text: `let api = "https://..."` and then "${api}/x".
                 is Expr.Name -> constText(e, s)?.let { listOf(it) }
                 else -> null
             }
-        return out?.distinct()?.takeIf { it.size <= MAX_SHAPES }
+        return out?.let(::capped)
     }
 
     /**
