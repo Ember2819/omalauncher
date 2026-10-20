@@ -604,7 +604,7 @@ class WidgetServices(
                 var sendBody = body
                 // Followed here rather than by HttpURLConnection, which would take the widget's headers (an API key, a
                 // secret) along to whatever server a redirect names: they go only to the server the widget wrote out.
-                for (hop in 0..MAX_REDIRECTS) {
+                repeat(MAX_REDIRECTS + 1) {
                     val connection = openHttp(target.toString(), timeoutSeconds * 1000, timeoutSeconds * 1000)
                     try {
                         connection.instanceFollowRedirects = false
@@ -618,16 +618,13 @@ class WidgetServices(
                             connection.outputStream.use { it.write(sendBody) }
                         }
                         val code = connection.responseCode
-                        val next = connection.getHeaderField("Location")?.let { runCatching { URL(target, it) }.getOrNull() }
-                        // Never from https down to http, as HttpURLConnection does.
-                        if (code in REDIRECTS && next != null && hop < MAX_REDIRECTS && (next.protocol == "https" || target.protocol == "http")) {
-                            // 307 and 308 send the same again; the others ask for a GET, as browsers do.
-                            if (code != 307 && code != 308) {
-                                sendMethod = "GET"
-                                sendBody = null
-                            }
-                            target = next
-                            continue
+                        val location = connection.getHeaderField("Location")
+                        if (code in REDIRECTS && location != null) {
+                            val next = redirect(code, target, URL(target, location), sendMethod, sendBody)
+                            target = next.url
+                            sendMethod = next.method
+                            sendBody = next.body
+                            return@repeat
                         }
                         val stream = if (code >= 400) connection.errorStream else connection.inputStream
                         // Widgets show a few values; a runaway response mustn't fill memory.
@@ -643,8 +640,6 @@ class WidgetServices(
             }
         }
 
-    /** A URL's scheme, host and port: a redirect that keeps them keeps the widget's headers. */
-    private fun origin(u: URL) = Triple(u.protocol, u.host.lowercase(), if (u.port == -1) u.defaultPort else u.port)
 
     override fun seal(plain: ByteArray) = SecretBox.seal(plain)
 
@@ -876,6 +871,35 @@ class WidgetServices(
                 .build()
         nm.notify(notificationId++, n)
     }
+}
+
+/** A widget's request after a redirect. */
+internal class Redirect(
+    val url: URL,
+    val method: String,
+    val body: ByteArray?,
+)
+
+/** A URL's scheme, host and port: a redirect that keeps them keeps the widget's headers. */
+internal fun origin(u: URL) = Triple(u.protocol, u.host.lowercase(), if (u.port == -1) u.defaultPort else u.port)
+
+/**
+ * The request a redirect [code] from [from] to [to] asks for, as browsers make it: 303 asks for a GET, as 301 and 302
+ * do for a POST; the others send the same again. Throws when it isn't followed: from https down to http, or a body
+ * (which may hold a secret, bound to the server the widget wrote out) to another server.
+ */
+internal fun redirect(
+    code: Int,
+    from: URL,
+    to: URL,
+    method: String,
+    body: ByteArray?,
+): Redirect {
+    if (to.protocol != "https" && to.protocol != "http") throw IOException("redirected to a URL that isn't http(s), not followed")
+    if (from.protocol == "https" && to.protocol == "http") throw IOException("redirected from https to http (${to.host}), not followed")
+    if (code == 303 || (code == 301 || code == 302) && method == "POST") return Redirect(to, "GET", null)
+    if (body != null && body.isNotEmpty() && origin(to) != origin(from)) throw IOException("redirected to another server (${to.host}), which would get the request's body: not followed")
+    return Redirect(to, method, body)
 }
 
 /** An embedded sound, `asset x = base64"..."`, for MediaPlayer. */
