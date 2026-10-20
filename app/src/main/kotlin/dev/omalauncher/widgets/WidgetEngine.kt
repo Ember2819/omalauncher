@@ -695,7 +695,7 @@ class WidgetEngine(
         var screen: String? = null
         val ok =
             try {
-                previews.render(spec, inst, cells, w, h, File(previewDir, "$name.png"), loaded).also {
+                previews.render(spec, inst, shownCells(cells), w, h, File(previewDir, "$name.png"), loaded).also {
                     // The screen { } as it opens over home, at the phone's size.
                     if (it && program.screen != null) {
                         val dm = context.resources.displayMetrics
@@ -709,12 +709,18 @@ class WidgetEngine(
             }
         // The file may have changed while this rendered; its own preview follows.
         if (hashes[name] != hash) return
-        val line = if (ok) "preview $hash ${cells.first}x${cells.second} ${w}x$h" else "preview-skipped $hash rendering failed"
+        val line = if (ok) shownCells(cells).let { (c, r) -> "preview $hash ${c}x$r ${w}x$h" } else "preview-skipped $hash rendering failed"
         writeCheck(spec.file, hash, "ok", listOfNotNull(line, screen).joinToString("\n"))
     }
 
     /** The tile's cells as it's laid out on home, else as the file sizes it; a face's are the whole grid. */
     private fun tileCells(spec: WidgetSpec) = (if (spec.isFace) layout.grid ?: (layout.columns to 12) else null) ?: layout.cell(spec.file.name)?.let { it.w to it.h } ?: spec.size?.let { (w, h) -> w.coerceIn(1, layout.columns) to h.coerceAtLeast(1) } ?: (3 to 3)
+
+    /**
+     * [cells] as home shows them, for `cols` and `rows`: on its side in landscape, like the tile on home. The preview
+     * shares the tile's instance, so drawing it with the file's cells would put them in the tile on home too.
+     */
+    private fun shownCells(cells: Pair<Int, Int>) = if (layout.turned) cells.second to cells.first else cells
 
     /** Waits until every source of [inst] has a value; what a preview draws after. */
     private fun loadedOf(inst: WidgetInstance): suspend () -> Unit = { snapshotFlow { inst.loaded() }.first { it } }
@@ -793,7 +799,7 @@ class WidgetEngine(
                     if (spec.kind == OwlKind.App || spec.kind == OwlKind.Panel || spec.kind == OwlKind.Keys) {
                         previews.renderScreen(spec, inst, dm.widthPixels, dm.heightPixels, out, ready)
                     } else {
-                        previews.render(spec, inst, cells, w, h, out, ready)
+                        previews.render(spec, inst, shownCells(cells), w, h, out, ready)
                     }
                 }
             }
