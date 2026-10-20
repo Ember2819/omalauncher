@@ -69,7 +69,7 @@ OWL looks like QML and JavaScript but isn't either; these are what code written 
 - A `let` reads only the lets above it (triggers and handlers can read any). Order them so each comes after what it uses.
 - A `let` inside a node is for its children, not for that node's own properties: `Column { let k = 3; width: k }` is "unknown name 'k'". Put it on the parent.
 - An arrow function can't be kept in a `let` and called: `let f = x => x * 2` then `f(3)` is "unknown function 'f'". Write the expression out where it's used, or make a component for repeated nodes.
-- Word values like `align`, `justify` and `style` take the word itself, not an expression: `align: mine ? start : end` is "'start' isn't a value here". Write both nodes, `if mine { Text { align: start; … } } else { Text { align: end; … } }`. Colors and numbers are values, so `color: hot ? red : foreground` works.
+- Words like `start` and `title` stand alone, as in `align: start`; in an expression they're names, so `align: mine ? start : end` is "'start' isn't a value here". Quote them there: `align: mine ? "start" : "end"`, `style: big ? "title" : "body"`. Colors are values, so `color: hot ? red : foreground` works as it is.
 - Handlers and `animate` go inside a component, not where it's used: `Chip { label: "a"; onTap: n = 1 }` is an error. Wrap the use instead, `Box { onTap: n = 1; Chip { label: "a" } }`.
 - `on x { }` doesn't run for x's first value, so to save what a source fetched the first time, write `on x first { }` (owl 9).
 - `Progress`, `Ring`, `Slider` and other nodes with a default size lose it once they have `width`, `height`, `size`, `fill` or `weight`: `Progress { fill: width }` is zero high. A Progress is full width already; leave `fill` off, or give it a `height`.
@@ -96,8 +96,7 @@ sections below say what's current.
 | panels and the prompt bar | `drawer.owl` (lazy lists, search with rank, Popup), `examples/65-ai-bar` (android.agents, ask, open) |
 | extra keys | `keybar.owl`, `examples/keybar-layers` (latch, layers), `examples/keybar-vim`, `examples/keybar-gamepad`, `examples/keybar-commands` (typeText) |
 | a live terminal | `45-terminal` |
-
-None of them is an app or sends with `post`; Apps and Sending below have whole ones.
+| an app that sends | `examples/ntfy` (two views with `back`, a source whose URL takes a state, `post` with a JSON body, and what it answers shown at once) |
 
 ## Declarations (top of the widget)
 
