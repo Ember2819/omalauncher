@@ -43,6 +43,7 @@ import dev.omalauncher.linux.GuestShell
 import dev.omalauncher.linux.Proot
 import dev.omalauncher.linux.ShellPool
 import dev.omalauncher.linux.ShellResult
+import dev.omalauncher.SecretBox
 import dev.omalauncher.openHttp
 import dev.omalauncher.openUrl
 import dev.omalauncher.readUpTo
@@ -618,6 +619,10 @@ class WidgetServices(
                 ShellResult("", e.message ?: e.toString(), -1)
             }
         }
+
+    override fun seal(plain: ByteArray) = SecretBox.seal(plain)
+
+    override fun unseal(sealed: ByteArray) = SecretBox.unseal(sealed)
 
     /** Web images and sounds on disk, by the SHA-256 of their URL. */
     private val fileCache by lazy { File(context.cacheDir, "owl-files") }

@@ -91,6 +91,12 @@ interface Services {
      */
     suspend fun remoteFile(url: String): File? = null
 
+    /** `secret` states, encrypted with a key only this app can use; null without one, and they aren't kept. */
+    fun seal(plain: ByteArray): ByteArray? = null
+
+    /** What [seal] encrypted; null if it can't be read (another install's key, or damaged). */
+    fun unseal(sealed: ByteArray): ByteArray? = null
+
     /**
      * `sound(...)`: plays [file] or [bytes] for [owner], in place of what it was playing; both null
      * stops it. [failed] hears why one couldn't play.
@@ -166,6 +172,8 @@ class WidgetInstance(
     private val onError: (String) -> Unit,
     /** Where `persist` state and histories are kept between runs. */
     private val savedFile: File? = null,
+    /** Where `secret` state is kept between runs, sealed by [Services.seal]. */
+    private val secretFile: File? = null,
     /** screen() and close(): opens or closes the widget's screen { }. */
     private val onScreen: (Boolean) -> Unit = {},
     /** Linux is installed and running; `optional` sources wait for it. Snapshot state. */
@@ -214,6 +222,11 @@ class WidgetInstance(
 
     private var lastSaved: List<Value>? = null
 
+    /** Slots of `state ... secret`, kept in [secretFile]. */
+    private val secrets = program.globals.indices.filter { (program.globals[it] as? Global.State)?.secret == true }
+
+    private var lastSealed: List<Value>? = null
+
     init {
         program.globals.forEachIndexed { i, g ->
             cells[i] =
@@ -227,6 +240,45 @@ class WidgetInstance(
         // State starts from its initial value; it may read sources, which are still null here.
         program.globals.forEachIndexed { i, g -> if (g is Global.State) write(i, eval(g.init, root, g.name)) }
         restore()
+        unseal()
+    }
+
+    private fun unseal() {
+        val file = secretFile?.takeIf { secrets.isNotEmpty() && it.exists() } ?: return
+        val text = runCatching { file.readBytes() }.getOrNull()?.let(services::unseal)?.toString(Charsets.UTF_8) ?: return
+        val saved = (runCatching { Json.parse(text) }.getOrNull() as? Obj)?.fields ?: return
+        for (i in secrets) {
+            val name = program.globals[i].name
+            // Sealed for other servers: the file was changed to send it elsewhere, so it's asked for again.
+            if ((saved[name] as? Obj)?.fields?.get("hosts") == hosts(name)) (saved[name] as Obj).fields["value"]?.let { write(i, it) }
+        }
+        lastSealed = secrets.map { read(it) }
+    }
+
+    /** The servers [name] is sent to, as kept with it. */
+    private fun hosts(name: String): Value = Lst(program.secretHosts[name].orEmpty().map { Str(it) })
+
+    /** Writes the secrets, sealed, if they changed; all unset deletes the file. */
+    private fun seal(values: List<Value>) {
+        val file = secretFile ?: return
+        if (values == lastSealed) return
+        runCatching {
+            if (values.all { it == Null || it == Str("") }) {
+                file.delete()
+            } else {
+                val json =
+                    Json.write(
+                        Obj(
+                            secrets.indices.associate {
+                                val name = program.globals[secrets[it]].name
+                                name to Obj(mapOf("value" to values[it], "hosts" to hosts(name)))
+                            },
+                        ),
+                    ) ?: return
+                writeAtomically(file, services.seal(json.toByteArray()) ?: error("no key to encrypt them with"))
+            }
+            lastSealed = values
+        }.onFailure { report("couldn't keep the secrets: ${it.message}") }
     }
 
     private fun restore() {
@@ -488,6 +540,8 @@ class WidgetInstance(
     }
 
     override fun report(message: String) {
+        // An error about a request's header or body could quote a secret; this goes to logcat and to Linux.
+        val message = secrets.fold(message) { m, i -> read(i).toString().takeIf { it.isNotEmpty() && read(i) != Null }?.let { m.replace(it, "•••") } ?: m }
         if (reported.add(message) && reported.size < 50) {
             Log.w("widgets", "${program.name}: $message")
             onError(message)
@@ -505,6 +559,11 @@ class WidgetInstance(
         program.globals.forEachIndexed { i, g ->
             if (g is Global.Source || g is Global.State || g is Global.Sampled) {
                 val j = old.program.globals.indexOfFirst { it.name == g.name && it::class == g::class }
+                // A secret only stays a secret, sent to the same servers; otherwise an edit could show it, or
+                // a plain state set by owl-send could become one.
+                val wasSecret = (old.program.globals.getOrNull(j) as? Global.State)?.secret == true
+                val isSecret = (g as? Global.State)?.secret == true
+                if ((wasSecret || isSecret) && (wasSecret != isSecret || old.program.secretHosts[g.name] != program.secretHosts[g.name])) return@forEachIndexed
                 if (j >= 0) write(i, old.read(j))
             }
         }
@@ -546,6 +605,12 @@ class WidgetInstance(
                     shown = now
                 }
             }
+        if (secrets.isNotEmpty() && secretFile != null) {
+            jobs +=
+                scope.launch {
+                    snapshotFlow { secrets.map { read(it) } }.collect { values -> withContext(Dispatchers.IO) { seal(values) } }
+                }
+        }
         if (persisted.isNotEmpty() && savedFile != null) {
             // At most one write every few seconds, however fast the sources sample.
             jobs +=
@@ -790,6 +855,8 @@ class WidgetInstance(
             val states = program.globals.filterIsInstance<Global.State>().joinToString { it.name }
             return if (i < 0) "no state '$name' (states: ${states.ifEmpty { "none" }})" else "'$name' isn't a state, so it can't be set (states: ${states.ifEmpty { "none" }})"
         }
+        // Only typed in on the phone, so a script can't swap in a token of its own.
+        if ((program.globals[i] as Global.State).secret) return "'$name' is a secret, so it can't be set from outside"
         write(i, value)
         refresh()
         return null
@@ -854,6 +921,7 @@ class WidgetInstance(
         terminals.clear()
         // A change made during the write interval would otherwise be lost.
         if (persisted.isNotEmpty()) save(persisted.map { read(it) })
+        if (secrets.isNotEmpty()) seal(secrets.map { read(it) })
     }
 
     /** Runs [g] and writes its value; false when an http fetch failed, so it's tried again soon. */

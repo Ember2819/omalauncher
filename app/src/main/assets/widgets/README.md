@@ -89,7 +89,7 @@ declarations.md and nodes.md, a face, an app, a panel or extra keys their own fi
 | docs/android.md | the phone's data: battery, media, notifications, volume, the next alarm, modes, apps, the drawer, agents |
 | docs/expressions.md | operators and every function, dates and times, numbers, changing lists and maps, chance |
 | docs/nodes.md | every node and its properties, the tile's size, text in pieces, fonts, gradients, frosted glass, images from the web, components, Terminal |
-| docs/handlers.md | handlers, every action, sending to web APIs with `post`, sounds |
+| docs/handlers.md | handlers, every action, sending to web APIs with `post`, tokens and passwords, sounds |
 | docs/drawing.md | Canvas and Shader |
 | docs/screens.md | a widget's full-screen view behind its tile |
 | docs/faces.md | faces: a whole home page |

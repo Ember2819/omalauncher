@@ -252,6 +252,8 @@ sealed interface Global {
         val init: Ev,
         /** Saved across restarts. */
         val persist: Boolean = false,
+        /** `secret`: saved across restarts encrypted, apart from [persist]'s values; it only goes into requests. */
+        val secret: Boolean = false,
     ) : Global
 
     class Let(
@@ -343,6 +345,8 @@ class Program(
     val triggers: List<Trigger>,
     /** Shell commands this widget can run, known without running it; for reviewing shared widgets. */
     val commands: List<String>,
+    /** Each `secret` state's servers, sorted: its sealed value is kept only while these stay the same. */
+    val secretHosts: Map<String, List<String>> = emptyMap(),
     /** Declared dependencies: package manager -> package names, e.g. pacman -> [jq, curl]. */
     val requires: Map<String, List<String>>,
     /**

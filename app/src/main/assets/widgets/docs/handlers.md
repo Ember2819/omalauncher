@@ -115,6 +115,42 @@ back, and base64url too, padded or not, so `parseJson(fromBase64(split(jwt, ".")
 says about itself (when it expires, `exp`); it's null when the text isn't base64. Both work on text,
 not on binary data.
 
+### Tokens and passwords
+
+Whenever a widget needs an API key, a token or a password, keep it in a `secret` state, never in a plain
+or `persist` one (owl 12). A secret is kept across restarts encrypted with a key that never leaves the
+phone, in a file of its own beside the widget's `persist` values, so Linux, a backup or a shared copy of
+the widget never holds it. Never write a token into the file itself either: ask for it with an `Input`
+whose `password: true` shows dots and keeps the keyboard from suggesting or learning what's typed.
+
+The compiler lets a secret go only into `http(...)`'s and `post(...)`'s headers and `post`'s body
+(through anything there, like `toBase64(...)`), and into `token == null` or `token != ""` to see whether
+it's set. Showing it, putting it in a URL, a command or a notification, copying it, a trigger on it or
+assigning it to another state is a compile error. A handler may set it: `token = value` from the Input,
+`token = null` to sign out; `owl-send` can't. The server a secret goes to is written out in the URL
+(`"https://api.example.com/${enc(id)}"`), not taken from a value.
+
+```owl
+widget "nas" {
+  meta { owl: 12 }
+  state token = null secret
+  source files = http(token == null ? null : "https://nas.example.com/api/files", {Authorization: "Bearer ${token}"}) json
+  Column {
+    if token == null {
+      Input { placeholder: "API token"; password: true; onSubmit: token = value }
+    } else {
+      for f in files ?? [] { Text { text: f.name } }
+      Text { text: "sign out"; style: muted; onTap: token = null }
+    }
+  }
+}
+```
+
+Gate the source on the token with a `null` URL, as above: without it, the source asks right away with
+`Bearer …` (null as text) and fails. A user name that isn't secret can sit in a plain `persist` state
+next to a secret password. A secret is kept for the servers it was typed in for: when the file changes
+to send it to another one, or no longer calls it `secret`, the widget starts without it and asks again.
+
 ## Sounds
 
 `sound(...)` plays a short clip: a chime when a timer ends, a voice reading the next step (owl 8). It takes

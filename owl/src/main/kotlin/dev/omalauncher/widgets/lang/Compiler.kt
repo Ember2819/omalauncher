@@ -62,6 +62,9 @@ class Compiler private constructor(
 
         /** A URL whose scheme and host are fixed text, so no value can send it elsewhere. */
         private val FIXED_HOST = Regex("""^https?://[A-Za-z0-9.-]+(:[0-9]+)?/""")
+
+        /** A URL's scheme, host and port, what a secret is bound to. */
+        private val SERVER = Regex("""^https?://[^/?#]+""")
     }
 
     /** Compile-time mirror of an [Env] frame. Only the first [visible] names resolve (lets see earlier lets only). */
@@ -84,6 +87,56 @@ class Compiler private constructor(
     private val globals = ArrayList<Global?>()
     private val slots = HashMap<String, Int>()
     private val states = HashSet<String>()
+
+    /** States declared `secret`: read only where [secretOk] says. */
+    private val secrets = HashSet<String>()
+
+    /** True while compiling what a secret may go into: a request's headers and body, or a check that it's set. */
+    private var secretOk = false
+
+    /** The secrets read while compiling a request's headers and body, see [sending]. */
+    private var sent: HashSet<String>? = null
+
+    /** Each secret's servers, as `https://host:port`: it's kept only while the file sends it to these. */
+    private val secretHosts = HashMap<String, MutableSet<String>>()
+
+    private fun <T> withSecrets(f: () -> T): T {
+        val was = secretOk
+        secretOk = true
+        try {
+            return f()
+        } finally {
+            secretOk = was
+        }
+    }
+
+    /**
+     * A request's headers or body, which may hold secrets: those it reads go to the servers its URL
+     * was listed with ([shapes], null when it's built from values), which must be fixed, so an edit
+     * that sends a secret elsewhere loses it (see [Program.secretHosts]).
+     */
+    private fun sending(
+        e: Expr,
+        scope: Scope,
+        shapes: List<String>?,
+    ): Ev {
+        val was = sent
+        val names = HashSet<String>()
+        sent = names
+        val ev =
+            try {
+                withSecrets { ex(e, scope) }
+            } finally {
+                sent = was
+            }
+        if (names.isNotEmpty()) {
+            if (shapes == null) fail("${names.first()} is a secret, so the server it goes to is written out: \"https://api.example.com/…\", not a value", e.pos)
+            val hosts = shapes.map { SERVER.find(it)?.value?.lowercase() ?: fail("${names.first()} is a secret, so the server it goes to is written out: \"https://api.example.com/…\"", e.pos) }
+            for (n in names) secretHosts.getOrPut(n) { HashSet() } += hosts
+        }
+        return ev
+    }
+
     private val sources = HashSet<String>()
     private val components = HashMap<String, Component>()
     private val commands = LinkedHashSet<String>()
@@ -161,7 +214,14 @@ class Compiler private constructor(
             if (d !is Decl.Meta && d !is Decl.Trigger && d.name in slots) fail("'${d.name}' is already declared", d.pos)
             when (d) {
                 is Decl.Source -> reserve(d.name, d.pos).also { sources += d.name }
-                is Decl.State -> reserve(d.name, d.pos).also { states += d.name }
+                is Decl.State ->
+                    reserve(d.name, d.pos).also {
+                        states += d.name
+                        if (d.secret) {
+                            since(SECRET, d.pos)
+                            secrets += d.name
+                        }
+                    }
                 is Decl.Asset -> reserve(d.name, d.pos)
                 else -> {}
             }
@@ -169,7 +229,7 @@ class Compiler private constructor(
         for (d in body.decls) {
             when (d) {
                 is Decl.Source -> globals[slots[d.name]!!] = source(d)
-                is Decl.State -> globals[slots[d.name]!!] = Global.State(d.name, chancy { ex(d.init, root) }, d.persist)
+                is Decl.State -> globals[slots[d.name]!!] = Global.State(d.name, chancy { ex(d.init, root) }, d.persist, d.secret)
                 is Decl.Asset -> globals[slots[d.name]!!] = asset(d)
                 is Decl.Let -> {
                     val g = let(d)
@@ -237,6 +297,7 @@ class Compiler private constructor(
             onTap = onTap,
             triggers = triggers,
             commands = commands.toList(),
+            secretHosts = secretHosts.mapValues { it.value.sorted() },
             warnings = warnings.toList(),
             requires = requires,
             needsLinux = guest || requires.isNotEmpty(),
@@ -320,6 +381,7 @@ class Compiler private constructor(
             statusBar = statusBar,
             triggers = triggers,
             commands = commands.toList(),
+            secretHosts = secretHosts.mapValues { it.value.sorted() },
             warnings = warnings.toList(),
             requires = requires,
             needsLinux = guest || requires.isNotEmpty(),
@@ -374,6 +436,7 @@ class Compiler private constructor(
             enter = enter,
             triggers = triggers,
             commands = commands.toList(),
+            secretHosts = secretHosts.mapValues { it.value.sorted() },
             warnings = warnings.toList(),
             requires = requires,
             needsLinux = guest || requires.isNotEmpty(),
@@ -417,6 +480,7 @@ class Compiler private constructor(
             screen = tree,
             triggers = triggers,
             commands = commands.toList(),
+            secretHosts = secretHosts.mapValues { it.value.sorted() },
             warnings = warnings.toList(),
             requires = requires,
             needsLinux = guest || requires.isNotEmpty(),
@@ -612,8 +676,8 @@ class Compiler private constructor(
                 val url = ex(e.args[0], root)
                 (url.const as? Str)?.v?.let { if (!it.startsWith("https://") && !it.startsWith("http://")) fail("http takes an http:// or https:// URL", e.args[0].pos) }
                 // Like a command's sh(...) values: listed by shape when the host is fixed and each value is enc(...) or a number.
-                listUrl("http GET", e.args[0], url, root)
-                Global.Source(d.name, "http", url, (every ?: 60.0).coerceAtLeast(5.0), d.json, timeout.coerceIn(1, 300), d.status, e.args.getOrNull(1)?.let { ex(it, root) })
+                val shapes = listUrl("http GET", e.args[0], url, root)
+                Global.Source(d.name, "http", url, (every ?: 60.0).coerceAtLeast(5.0), d.json, timeout.coerceIn(1, 300), d.status, e.args.getOrNull(1)?.let { sending(it, root, shapes) })
             }
             e is Expr.Call && e.name in setOf("cmd", "stream") -> {
                 if (e.args.size != 1 || e.named.isNotEmpty()) fail("${e.name}(\"command\") takes one command", e.pos)
@@ -1065,9 +1129,9 @@ class Compiler private constructor(
                 (constant(m, "method") as? Str)?.v?.uppercase()?.takeIf { it in POST_METHODS }
                     ?: fail("method: is one of ${POST_METHODS.joinToString { "\"$it\"" }}", m.pos)
             } ?: "POST"
-        listUrl("http $method", call.args[0], url, scope)
-        val body = call.args.getOrNull(1)?.let { ex(it, scope) }
-        val headers = call.args.getOrNull(2)?.let { ex(it, scope) }
+        val shapes = listUrl("http $method", call.args[0], url, scope)
+        val body = call.args.getOrNull(1)?.let { sending(it, scope, shapes) }
+        val headers = call.args.getOrNull(2)?.let { sending(it, scope, shapes) }
         return { env ->
             val target = url(env)
             // Like any action whose value hasn't loaded: a null URL sends nothing.
@@ -1084,7 +1148,7 @@ class Compiler private constructor(
         e: Expr,
         url: Ev,
         scope: Scope,
-    ) {
+    ): List<String>? {
         val shapes = (url.const as? Str)?.let { listOf(it.v) } ?: shapes(e, scope, "enc")?.takeIf { it.isNotEmpty() && it.all { s -> FIXED_HOST.containsMatchIn(s) } }
         if (shapes == null) {
             commands += "$what (a URL built from widget values)"
@@ -1092,6 +1156,7 @@ class Compiler private constructor(
         } else {
             shapes.forEach { commands += "$what $it" }
         }
+        return shapes
     }
 
     /**
@@ -1185,6 +1250,13 @@ class Compiler private constructor(
         return slots[name]?.let { Ref.Slot(it) }
     }
 
+    private fun isSecret(
+        e: Expr,
+        s: Scope,
+    ) = e is Expr.Name && e.name in secrets && lookup(e.name, s) is Ref.Slot
+
+    private fun isUnset(e: Expr) = e is Expr.Lit && (e.value == Null || e.value == Str(""))
+
     private fun ex(
         e: Expr,
         s: Scope,
@@ -1217,8 +1289,10 @@ class Compiler private constructor(
                 }
             }
             is Expr.Binary -> {
-                val a = ex(e.a, s)
-                val b = ex(e.b, s)
+                // `token == null` says whether it's set, which a widget shows (sign in, or the data).
+                val check = (e.op == "==" || e.op == "!=") && (isSecret(e.a, s) && isUnset(e.b) || isSecret(e.b, s) && isUnset(e.a))
+                val a = if (check) withSecrets { ex(e.a, s) } else ex(e.a, s)
+                val b = if (check) withSecrets { ex(e.b, s) } else ex(e.b, s)
                 when (e.op) {
                     // Like JS: `x || "none"` gives x when it's set.
                     "&&" -> fold(listOf(a, b)) { env -> a(env).let { if (!it.truthy) it else b(env) } }
@@ -1275,7 +1349,12 @@ class Compiler private constructor(
     ): Ev {
         when (val ref = lookup(e.name, s)) {
             is Ref.Local -> return Ev(null) { env -> env.local(ref.depth, ref.index) }
-            is Ref.Slot -> return Ev(null) { env -> env.host.read(ref.index) }
+            is Ref.Slot -> {
+                // Never shown, run or copied: on screen or in Linux, it would be out.
+                if (e.name in secrets) sent?.add(e.name)
+                if (e.name in secrets && !secretOk) fail("${e.name} is a secret: it only goes into http(...)'s and post(...)'s headers and body, or is compared with null or \"\"", e.pos)
+                return Ev(null) { env -> env.host.read(ref.index) }
+            }
             null -> {}
         }
         Builtins.constants[e.name]?.let { return Ev.of(it) }
