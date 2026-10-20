@@ -61,6 +61,44 @@ widget "memory" {
 Every property is a live expression: when a source updates, only the parts
 that read it redraw. Properties are separated by newlines or `;`.
 
+## Mistakes to avoid
+
+OWL looks like QML and JavaScript but isn't either; these are what code written from habit gets wrong:
+
+- No exponent literals: `1e9` is "unknown unit 'e'", since letters after a number are a unit (`5m`, `3x2`). Write `1000000000`.
+- A `let` reads only the lets above it (triggers and handlers can read any). Order them so each comes after what it uses.
+- A `let` inside a node is for its children, not for that node's own properties: `Column { let k = 3; width: k }` is "unknown name 'k'". Put it on the parent.
+- An arrow function can't be kept in a `let` and called: `let f = x => x * 2` then `f(3)` is "unknown function 'f'". Write the expression out where it's used, or make a component for repeated nodes.
+- Word values like `align`, `justify` and `style` take the word itself, not an expression: `align: mine ? start : end` is "'start' isn't a value here". Write both nodes, `if mine { Text { align: start; … } } else { Text { align: end; … } }`. Colors and numbers are values, so `color: hot ? red : foreground` works.
+- Handlers and `animate` go inside a component, not where it's used: `Chip { label: "a"; onTap: n = 1 }` is an error. Wrap the use instead, `Box { onTap: n = 1; Chip { label: "a" } }`.
+- `on x { }` doesn't run for x's first value, so to save what a source fetched the first time, write `on x first { }` (owl 9).
+- `Progress`, `Ring`, `Slider` and other nodes with a default size lose it once they have `width`, `height`, `size`, `fill` or `weight`: `Progress { fill: width }` is zero high. A Progress is full width already; leave `fill` off, or give it a `height`.
+- In a handler each statement sees the writes before it: read what a later statement needs before changing it.
+- `random()` and `shuffle(list)` only work in handlers and a state's first value; for values that look random but stay put, use `hash` (see Chance).
+
+## Examples
+
+Read the one closest to what you're making before you start. Files at the top of this folder are on
+home already; the rest are in `examples/`. Examples without `meta { owl: … }` are written for owl 1,
+so they don't use what came later, like `if` in handlers or a Row's Texts as wide as their text; the
+sections below say what's current.
+
+| to learn | read |
+|---|---|
+| a shell command shown as text | `examples/10-clock` (clock, theme name), `examples/30-disk` (df, a bar) |
+| a number over time | `examples/20-system` (history, Sparkline, requires), `examples/93-latency` (stream: one long-running command) |
+| JSON and lists from commands | `examples/80-system-info` (json), `examples/70-processes` (lines into maps, a bar per row), `examples/94-scripts`, `examples/96-ai-usage` (jq in a `"""` command), `examples/60-agents` (for, if, Button) |
+| the web, no Linux needed | `examples/50-weather` (http), `examples/86-whats-new` (a screen behind the tile), `10-today` (weather, Input for a city, persist) |
+| the phone's own data | `examples/40-battery` (Ring), `examples/85-quick` (alarm, modes, torch), `examples/97-now-playing` (media, album art), `examples/98-notifications`, `examples/99-volume` (Slider), `20-fetch` (with or without Linux) |
+| state, buttons and timers | `examples/91-focus` (persist, `at`, notify), `examples/87-breathe` (a session paced by the clock), `examples/88-notes` (Input, a saved list) |
+| drawing | `examples/90-analog-clock` (Canvas), `50-koi` (pixel art, taps), `60-owl` (sprites, a pet that keeps its state), `examples/92-aurora` and `examples/89-lava` (Shader) |
+| faces, a whole page | `examples/00-start` (frost, Grid, spans), `examples/01-minimal`, `examples/02-pixel`, `examples/03-matrix` |
+| panels and the prompt bar | `drawer.owl` (lazy lists, search with rank, Popup), `examples/65-ai-bar` (android.agents, ask, open) |
+| extra keys | `keybar.owl`, `examples/keybar-layers` (latch, layers), `examples/keybar-vim`, `examples/keybar-gamepad`, `examples/keybar-commands` (typeText) |
+| a live terminal | `45-terminal` |
+
+None of them is an app or sends with `post`; Apps and Sending below have whole ones.
+
 ## Declarations (top of the widget)
 
 | declaration | meaning |
@@ -1172,9 +1210,4 @@ and the message goes to `.errors/`.
 - A `Text` without `width`, `weight` or `fill` takes the full width, except in a `Row` or `Flow` since owl 10,
   where it's as wide as its text, or in an unsized Column in one since owl 11. Before owl 10, give the Texts next to a `weight: 1` one a `width`, or the
   weighted one is squeezed to nothing.
-- Look at the example widgets in this folder for patterns: `90-analog-clock` (Canvas),
-  `91-focus` (state, buttons and `at`), `92-aurora` (Shader), `93-latency` (stream),
-  `88-notes` (Input), `98-notifications` (android.notifications), `99-volume` (Slider),
-  `65-ai-bar` (the prompt bar and recent strip: android.agents, android.recent, open and ask),
-  and next to it `10-today` (a weather screen behind the tile), `20-fetch` (fastfetch as a dashboard), `45-terminal` (a live terminal) and
-  `60-owl` (sprites).
+- Look at the examples for patterns: Examples, near the top, says which one shows what.

@@ -56,6 +56,15 @@ class ExamplesTest {
         assertTrue("not in the README: $missing", missing.isEmpty())
     }
 
+    /** The README's Examples table points agents at files; each must be one this app ships. */
+    @Test fun readmeExamplesExist() {
+        val section = File("src/main/assets/widgets/README.md").readText().substringAfter("## Examples\n").substringBefore("\n## ")
+        val named = Regex("`((?:examples/)?[\\w-]+?)(?:\\.owl)?`").findAll(section).map { it.groupValues[1] }.filter { it.first().isDigit() || "/" in it || it.startsWith("drawer") || it.startsWith("keybar") }.toList()
+        assertTrue(named.size >= 20)
+        val missing = named.filter { !File("src/main/assets/widgets/$it.owl").exists() }
+        assertTrue("not in assets/widgets: $missing", missing.isEmpty())
+    }
+
     @Test fun examplesListTheirCommands() {
         val p = Compiler.compile(examples.first { it.name == "20-system.owl" }.readText())
         assertEquals(listOf("free -b | awk '/Mem:/ {print \$2, \$3}'", "btop"), p.commands)
