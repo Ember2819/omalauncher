@@ -299,11 +299,12 @@ class WidgetServices(
         fontSize: Double?,
     ) = runtime.terminals.create(command, fontSize)
 
-    override fun fileUpdates(path: String) = watchFile(guestFile(path))
+    // Resolved again for every read, so a folder swapped for a link out of Linux isn't followed.
+    override fun fileUpdates(path: String) = watchFile { guestFile(path) }
 
-    override fun guestFile(path: String): File {
+    override fun guestFile(path: String): File? {
         val p = if (path.startsWith("~/")) Proot.GUEST_HOME + "/" + path.removePrefix("~/") else path
-        return proot.hostFile(p)
+        return proot.guestFile(p)
     }
 
     /** The phone itself, which the guest can't identify: it has no DMI tables, and /system isn't mounted. */

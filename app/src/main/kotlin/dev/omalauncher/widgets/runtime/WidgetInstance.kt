@@ -147,8 +147,8 @@ interface Services {
         done: () -> Unit,
     )
 
-    /** A file inside the guest, for Image { src: "~/pics/x.png" }. */
-    fun guestFile(path: String): java.io.File
+    /** A file inside the guest, for Image { src: "~/pics/x.png" }; null for one out of it. */
+    fun guestFile(path: String): java.io.File?
 
     /** A guest file's text now and after every change, for `file(...)`; a missing file reads as "". */
     fun fileUpdates(path: String): Flow<String>
@@ -836,7 +836,7 @@ class WidgetInstance(
                     when {
                         src.startsWith("https://") -> services.remoteFile(src) to null
                         src.startsWith("asset:") -> null to (program.globals.firstOrNull { it.name == src.removePrefix("asset:") } as? Global.Asset)?.bytes
-                        else -> services.guestFile(src).takeIf { it.isFile } to null
+                        else -> services.guestFile(src)?.takeIf { it.isFile } to null
                     }
                 }
             if (n != sounds) return@launch

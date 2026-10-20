@@ -94,7 +94,7 @@ class LauncherFont(
         val lines = runCatching { cache.readLines() }.getOrNull() ?: return null
         if (lines.firstOrNull() != family) return null
         val faces = lines.drop(1).mapNotNull(Face::decode)
-        return faces.takeIf { it.isNotEmpty() && it.all { face -> proot.hostFile(face.path).isFile } }
+        return faces.takeIf { it.isNotEmpty() && it.all { face -> proot.guestFile(face.path)?.isFile == true } }
     }
 
     private fun save(
@@ -122,7 +122,8 @@ class LauncherFont(
     ): FontFamily? {
         val fonts =
             faces.mapNotNull { face ->
-                val file = if (host) proot.hostFile(face.path) else File(face.path)
+                // Paths fontconfig in the guest gave, so read as the guest sees them.
+                val file = (if (host) proot.guestFile(face.path) else File(face.path)) ?: return@mapNotNull null
                 // A variable font's file is every weight; the axis picks this one, as Compose's Font(file) does.
                 runCatching {
                     Font.Builder(file)

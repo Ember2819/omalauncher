@@ -41,7 +41,6 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import dev.omalauncher.Runtime
 import dev.omalauncher.linux.GuestEntry
-import dev.omalauncher.linux.GuestFs
 import dev.omalauncher.linux.shellQuote
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -56,7 +55,7 @@ fun FilesScreen(
     onExit: () -> Unit,
 ) {
     val context = LocalContext.current
-    val fs = remember { GuestFs(runtime.proot::hostFile) }
+    val fs = runtime.proot.guestFs
     val scope = rememberCoroutineScope()
 
     var path by remember(startPath) { mutableStateOf(fs.normalize(startPath)) }
