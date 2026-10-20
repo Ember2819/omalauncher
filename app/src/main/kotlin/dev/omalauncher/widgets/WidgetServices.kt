@@ -107,6 +107,10 @@ import java.util.concurrent.ConcurrentHashMap
 
 private const val MAX_HTTP_BYTES = 1 shl 20
 
+private const val MAX_REDIRECTS = 5
+
+private val REDIRECTS = setOf(301, 302, 303, 307, 308)
+
 /**
  * How often `android.drawer` changes at most. Icons load one at a time, and each changes `hasIcon`: without this a
  * cold start would rebuild the drawer, and everything a panel works out from it, once for every icon.
@@ -595,31 +599,52 @@ class WidgetServices(
         withContext(Dispatchers.IO) {
             if (!url.startsWith("https://") && !url.startsWith("http://")) return@withContext ShellResult("", "not an http(s) URL: $url", -1)
             try {
-                val connection = openHttp(url, timeoutSeconds * 1000, timeoutSeconds * 1000)
-                try {
-                    connection.setRequestProperty("User-Agent", "omalauncher-widgets")
-                    headers.forEach { (k, v) -> connection.setRequestProperty(k, v) }
-                    if (body != null) {
-                        connection.requestMethod = method
+                var target = URL(url)
+                var sendMethod = if (body != null) method else "GET"
+                var sendBody = body
+                // Followed here rather than by HttpURLConnection, which would take the widget's headers (an API key, a
+                // secret) along to whatever server a redirect names: they go only to the server the widget wrote out.
+                for (hop in 0..MAX_REDIRECTS) {
+                    val connection = openHttp(target.toString(), timeoutSeconds * 1000, timeoutSeconds * 1000)
+                    try {
+                        connection.instanceFollowRedirects = false
+                        connection.setRequestProperty("User-Agent", "omalauncher-widgets")
+                        if (origin(target) == origin(URL(url))) headers.forEach { (k, v) -> connection.setRequestProperty(k, v) }
+                        connection.requestMethod = sendMethod
                         // A DELETE usually has no body, and some servers refuse one.
-                        if (method != "DELETE" || body.isNotEmpty()) {
+                        if (sendBody != null && (sendMethod != "DELETE" || sendBody.isNotEmpty())) {
                             connection.doOutput = true
-                            connection.setFixedLengthStreamingMode(body.size)
-                            connection.outputStream.use { it.write(body) }
+                            connection.setFixedLengthStreamingMode(sendBody.size)
+                            connection.outputStream.use { it.write(sendBody) }
                         }
+                        val code = connection.responseCode
+                        val next = connection.getHeaderField("Location")?.let { runCatching { URL(target, it) }.getOrNull() }
+                        // Never from https down to http, as HttpURLConnection does.
+                        if (code in REDIRECTS && next != null && hop < MAX_REDIRECTS && (next.protocol == "https" || target.protocol == "http")) {
+                            // 307 and 308 send the same again; the others ask for a GET, as browsers do.
+                            if (code != 307 && code != 308) {
+                                sendMethod = "GET"
+                                sendBody = null
+                            }
+                            target = next
+                            continue
+                        }
+                        val stream = if (code >= 400) connection.errorStream else connection.inputStream
+                        // Widgets show a few values; a runaway response mustn't fill memory.
+                        val text = stream?.use { String(it.readUpTo(MAX_HTTP_BYTES), Charsets.UTF_8) }.orEmpty()
+                        return@withContext if (code in 200..299) ShellResult(text.trimEnd(), "", code) else ShellResult(text.trimEnd(), connection.responseMessage.orEmpty(), code)
+                    } finally {
+                        connection.disconnect()
                     }
-                    val code = connection.responseCode
-                    val stream = if (code >= 400) connection.errorStream else connection.inputStream
-                    // Widgets show a few values; a runaway response mustn't fill memory.
-                    val body = stream?.use { String(it.readUpTo(MAX_HTTP_BYTES), Charsets.UTF_8) }.orEmpty()
-                    if (code in 200..299) ShellResult(body.trimEnd(), "", code) else ShellResult(body.trimEnd(), connection.responseMessage.orEmpty(), code)
-                } finally {
-                    connection.disconnect()
                 }
+                ShellResult("", "too many redirects", -1)
             } catch (e: IOException) {
                 ShellResult("", e.message ?: e.toString(), -1)
             }
         }
+
+    /** A URL's scheme, host and port: a redirect that keeps them keeps the widget's headers. */
+    private fun origin(u: URL) = Triple(u.protocol, u.host.lowercase(), if (u.port == -1) u.defaultPort else u.port)
 
     override fun seal(plain: ByteArray) = SecretBox.seal(plain)
 
