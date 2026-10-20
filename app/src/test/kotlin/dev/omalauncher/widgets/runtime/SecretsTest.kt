@@ -88,6 +88,19 @@ class SecretsTest {
         instance().also { it.adopt(plain) }.let { assertEquals(Str("s3cr3t"), it.token()) }
     }
 
+    /** One that can't be read, like another install's, is kept until a new one is typed in, and the widget says why it asks. */
+    @Test fun keptWhenItCantBeRead() {
+        sealed.writeBytes(byteArrayOf(1, 2, 3))
+        val errors = ArrayList<String>()
+        val a = instance(errors = errors)
+        assertEquals(Null, a.token())
+        a.stop()
+        assertTrue(sealed.isFile)
+        assertTrue(errors.toString(), errors.single().contains("couldn't read the secrets"))
+        instance().also { it.typeToken("s3cr3t") }.stop()
+        assertEquals(Str("s3cr3t"), instance().token())
+    }
+
     /** owl-send can't swap in a token, and an error never quotes one, as it is or URL-encoded. */
     @Test fun notSetFromOutsideNorReported() {
         val errors = ArrayList<String>()

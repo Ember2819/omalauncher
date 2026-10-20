@@ -247,8 +247,12 @@ class WidgetInstance(
 
     private fun unseal() {
         val file = secretFile?.takeIf { secrets.isNotEmpty() && it.exists() } ?: return
-        val text = runCatching { file.readBytes() }.getOrNull()?.let(services::unseal)?.toString(Charsets.UTF_8) ?: return
-        val saved = (runCatching { Json.parse(text) }.getOrNull() as? Obj)?.fields ?: return
+        // As if just written: one that can't be read (another install's key, or a keystore not ready yet) stays for the
+        // next start, rather than being deleted as all unset, until a secret is set again.
+        lastSealed = secrets.map { read(it) }
+        val unreadable = "couldn't read the secrets it kept, so it asks for them again"
+        val text = runCatching { file.readBytes() }.getOrNull()?.let(services::unseal)?.toString(Charsets.UTF_8) ?: return report(unreadable)
+        val saved = (runCatching { Json.parse(text) }.getOrNull() as? Obj)?.fields ?: return report(unreadable)
         for (i in secrets) {
             val name = program.globals[i].name
             // Sealed for other servers: the file was changed to send it elsewhere, so it's asked for again.
