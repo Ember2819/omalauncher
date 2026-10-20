@@ -151,8 +151,8 @@ class Compiler private constructor(
         val level = levelField?.let { constant(it.value, "meta values").num()?.toInt() ?: fail("owl: takes a number, like owl: 1", it.pos) } ?: 1
         if (level > LEVEL) fail("this widget needs owl $level; the launcher supports up to $LEVEL, so update the launcher", levelField!!.pos)
         if (body.animations.isNotEmpty()) fail("animate belongs inside a node", body.animations[0].pos)
-        // An app and a panel check their own (onBack, onSubmit).
-        if (ast.kind != OwlKind.App && ast.kind != OwlKind.Panel) {
+        // An app, a panel and keys check their own (onBack, onSubmit).
+        if (ast.kind != OwlKind.App && ast.kind != OwlKind.Panel && ast.kind != OwlKind.Keys) {
             for (h in body.handlers) if (h.name != "onTap") fail("a ${ast.kind.word} only takes onTap at the top level", h.pos)
         }
 
@@ -191,6 +191,7 @@ class Compiler private constructor(
         val requires = requires(body.decls.filterIsInstance<Decl.Requires>().flatMap { it.fields })
         if (ast.kind == OwlKind.App) return app(body, meta, level, requires, globals.map { it!! }, triggers)
         if (ast.kind == OwlKind.Panel) return panel(body, meta, level, requires, globals.map { it!! }, triggers)
+        if (ast.kind == OwlKind.Keys) return keys(body, meta, level, requires, globals.map { it!! }, triggers)
         // A face is a widget that fills a home page of its own, the whole screen: it gets a screen's room, and
         // has no tile's size.
         val allowed = if (isFace) FACE_PROPS else WIDGET_PROPS
@@ -371,6 +372,49 @@ class Compiler private constructor(
             onSubmit = onSubmit,
             onKey = onKey,
             enter = enter,
+            triggers = triggers,
+            commands = commands.toList(),
+            warnings = warnings.toList(),
+            requires = requires,
+            needsLinux = guest || requires.isNotEmpty(),
+            programs = scripts.flatMap(ShellWords::programs).toSortedSet(),
+            animated = animated,
+            terminal = terminal,
+            nodeCount = nodes,
+            kind = ast.kind,
+        )
+    }
+
+    /**
+     * The extra keys: the bar over the soft keyboard while typing in a terminal, as tall as its nodes. The launcher
+     * puts it there, and keeps it from taking focus, so the keyboard stays up; `pressKey(...)` and `latch(...)` reach the
+     * terminal.
+     */
+    private fun keys(
+        body: Body,
+        meta: Map<String, Value>,
+        level: Int,
+        requires: Map<String, List<String>>,
+        globals: List<Global>,
+        triggers: List<Trigger>,
+    ): Program {
+        since(KEYS_FILE, 0)
+        body.props.firstOrNull()?.let { fail("extra keys take no properties; the launcher puts them over the keyboard, as tall as their nodes", it.pos) }
+        body.handlers.firstOrNull()?.let { fail("handlers go on the keys inside, like onPress: pressKey(\"esc\")", it.pos) }
+        body.items.firstOrNull { it is Item.Node && it.type == "screen" }?.let { fail("extra keys have no screen { }: their nodes are the bar", it.pos) }
+        nodes = 0
+        maxNodes = MAX_SCREEN_NODES
+        inScreen = true
+        val tree = items(body.items, root, Children.UI)
+        if (tree.isEmpty()) fail("extra keys need at least one node, like Button { text: \"esc\"; onPress: pressKey(\"esc\") }", 0)
+        (screenAction ?: openScreen)?.let { fail("screen() and close() open and close a widget's screen { }; the extra keys come and go with the keyboard", it) }
+        checkLevel(level)
+        return Program(
+            name = ast.name ?: "keys",
+            meta = meta,
+            level = level,
+            globals = globals,
+            screen = tree,
             triggers = triggers,
             commands = commands.toList(),
             warnings = warnings.toList(),
@@ -770,6 +814,10 @@ class Compiler private constructor(
             if (p.name == "reverse" && body.props.none { it.name == "lazy" }) fail("reverse lists a lazy ${n.type} from its end: add lazy: true", p.pos)
             if (p.name == "background" && gradient(p.value)) since(GRADIENT_BACKGROUND, p.pos)
             if (p.name == "frost") since("frost", p.pos)
+            if (p.name == "repeats") {
+                since("repeats", p.pos)
+                if (body.handlers.none { it.name == "onPress" }) fail("repeats runs onPress again while the finger stays down: add onPress", p.pos)
+            }
             if (p.name == "font") font(p.value, scope)
             props[p.name] = prop(p, scope)
         }
@@ -971,6 +1019,12 @@ class Compiler private constructor(
                 }
                 since(call.name, call.pos)
                 if (call.name == "sound") webFile(call.args[0], scope, "sound")
+                if (call.name == "pressKey") {
+                    (args[0].const as? Str)?.v?.let { if (KeyNames.combo(it) == null) fail(KEY_NAMES, call.args[0].pos) }
+                    commands += "press keys in the Linux window you're typing in: " + ((args[0].const as? Str)?.v ?: "keys built from widget values")
+                }
+                if (call.name == "typeText") commands += "type into the Linux window you're typing in: " + ((args[0].const as? Str)?.v ?: "text built from widget values")
+                if (call.name == "latch") (args.getOrNull(1)?.const as? Str)?.v?.let { if (it !in LATCHES) fail("latch's second value is ${LATCHES.joinToString()}", call.args[1].pos) }
                 if (call.name == "screen" || call.name == "close") screenAction = screenAction ?: call.pos
                 if (call.name == "screen") openScreen = openScreen ?: call.pos
                 // The reviewer sees what a widget would ask, as it sees a command.
