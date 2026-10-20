@@ -31,6 +31,7 @@ import dev.omalauncher.widgets.lang.Env
 import dev.omalauncher.widgets.lang.Ev
 import dev.omalauncher.widgets.lang.Global
 import dev.omalauncher.widgets.lang.Host
+import dev.omalauncher.widgets.lang.KeyNames
 import dev.omalauncher.widgets.lang.Json
 import dev.omalauncher.widgets.lang.Lst
 import dev.omalauncher.widgets.lang.Null
@@ -485,6 +486,12 @@ class WidgetInstance(
         if ((name == "ask" || name == "open") && inTrigger && !foreground()) return report("$name(...) in a trigger works only while the app or screen is open")
         // Keys go to whatever window has the keyboard: only from a touch, never on a timer or a fetched value.
         if ((name == "pressKey" || name == "typeText" || name == "latch") && inTrigger) return report("$name(...) works in handlers like onPress, not in a trigger")
+        // Names built from values, which the compiler couldn't check: say so rather than press nothing.
+        val key = args.firstOrNull()?.takeIf { it != Null }?.toString()
+        if (name == "pressKey" && key != null && KeyNames.combo(key) == null) return report("pressKey(\"$key\") names no key; ${KeyNames.help}")
+        if (name == "latch" && key != null && key !in KeyNames.latches) return report("latch(\"$key\"): latch takes ${KeyNames.latches.joinToString()}")
+        val how = args.getOrNull(1)?.takeIf { it != Null }?.toString()
+        if (name == "latch" && how != null && how !in KeyNames.hows) return report("latch's second value is ${KeyNames.hows.joinToString()}, not \"$how\"")
         // Only this widget refreshes afterwards; the others keep their own intervals.
         services.act(name, args) { refresh() }
     }

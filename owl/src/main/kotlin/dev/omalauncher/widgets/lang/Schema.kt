@@ -228,9 +228,3 @@ internal val WIDGET_PROPS = setOf("size", "minSize", "page", "order", "padding",
 
 /** A face has no tile's size; it says where it goes and whether the status bar stays over it. */
 internal val FACE_PROPS = setOf("page", "order", "padding", "background", "statusBar")
-
-/** What `latch(...)`'s second value may be; without one it turns the modifier on for the next key, or off. */
-internal val LATCHES = setOf("once", "locked", "off")
-
-internal val KEY_NAMES =
-    "pressKey takes a key, ${KeyNames.names.joinToString()} or a character, with modifiers in front: \"ctrl+c\", \"shift+insert\", \"ctrl+alt+t\""

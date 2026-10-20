@@ -17,6 +17,9 @@ object KeyNames {
     /** The modifiers `latch(...)` holds for the next key: Super stays the launcher's. */
     val latches = listOf("ctrl", "alt", "shift")
 
+    /** What `latch(...)`'s second value may be; without one it turns the modifier on for the next key, or off. */
+    val hows = listOf("once", "locked", "off")
+
     private val named =
         buildMap {
             put("esc", 1)
@@ -39,8 +42,8 @@ object KeyNames {
             put("f12", 88)
         }
 
-    /** The names [combo] knows besides single characters, for error messages. */
-    val names: Set<String> get() = named.keys
+    /** What pressKey takes, for the compiler's errors and the runtime's when the name is built from values. */
+    val help = "pressKey takes a key, ${named.keys.joinToString()} or a character, with modifiers in front: \"ctrl+c\", \"shift+insert\", \"ctrl+alt+t\""
 
     private const val UNSHIFTED = "1234567890-=qwertyuiop[]asdfghjkl;'`\\zxcvbnm,./ "
     private const val SHIFTED = "!@#$%^&*()_+QWERTYUIOP{}ASDFGHJKL:\"~|ZXCVBNM<>? "
