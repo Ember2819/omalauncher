@@ -877,7 +877,7 @@ class LangTest {
                     " Text { text: get(kb ?? {}, \"ctrl\", \"off\"); onTap: latch(\"ctrl\"); onLongPress: latch(\"ctrl\", \"locked\") }\n" +
                     " Button { text: \"ls\"; onPress: typeText(\"ls\\n\") } } }",
             )
-        assertEquals(OwlKind.Keys, p.kind)
+        assertEquals(OwlKind.Keybar, p.kind)
         assertEquals("mine", p.name)
         assertTrue(p.root.isEmpty())
         assertFalse(p.needsLinux)

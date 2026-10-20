@@ -96,7 +96,7 @@ internal fun Runtime.gestureProblems(): List<Pair<String, List<String>>> {
             spec.file.name to listOf("$what until it's fixed: " + spec.error!!.lineSequence().first())
         }
     // keybar.owl too: the stock keys stand in for it as quietly.
-    val keys = widgets.specs.firstOrNull { it.file.name == WidgetEngine.KEYS && it.error != null }?.let { it.file.name to listOf("the extra keys are the stock ones until it's fixed: " + it.error!!.lineSequence().first()) }
+    val keys = widgets.specs.firstOrNull { it.file.name == WidgetEngine.KEYBAR && it.error != null }?.let { it.file.name to listOf("the extra keys are the stock ones until it's fixed: " + it.error!!.lineSequence().first()) }
     return panels + listOfNotNull(keys)
 }
 
@@ -282,11 +282,11 @@ private fun ExtraKeysRow(
     runtime: Runtime,
     onAgent: (title: String, command: (bin: String) -> String) -> Unit,
 ) {
-    val spec = runtime.widgets.specs.firstOrNull { it.file.name == WidgetEngine.KEYS } ?: return
+    val spec = runtime.widgets.specs.firstOrNull { it.file.name == WidgetEngine.KEYBAR } ?: return
     // Whether it's still the bar as shipped; read again when the file reloads, which makes a new spec.
     val stock =
         remember(spec) {
-            runCatching { spec.file.readBytes().contentEquals(java.io.File(spec.file.parentFile, WidgetEngine.STOCK_KEYS).readBytes()) }.getOrDefault(false)
+            runCatching { spec.file.readBytes().contentEquals(java.io.File(spec.file.parentFile, WidgetEngine.STOCK_KEYBAR).readBytes()) }.getOrDefault(false)
         }
     Row(Modifier.card(), verticalAlignment = Alignment.CenterVertically) {
         BasicText("extra keys", Modifier.weight(1f), style = Mono.copy(fontSize = TextSize.Item))

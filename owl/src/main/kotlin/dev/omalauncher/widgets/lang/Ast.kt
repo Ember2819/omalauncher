@@ -264,7 +264,7 @@ enum class OwlKind(
     Face("face"),
     App("app"),
     Panel("panel"),
-    Keys("keybar"),
+    Keybar("keybar"),
     ;
 
     companion object {

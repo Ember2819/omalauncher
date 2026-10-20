@@ -536,7 +536,7 @@ private fun Detail(
                     when (market.kind) {
                         OwlKind.Widget -> "add to page $page"
                         OwlKind.Face -> "add as a face"
-                        OwlKind.App, OwlKind.Panel, OwlKind.Keys -> "install"
+                        OwlKind.App, OwlKind.Panel, OwlKind.Keybar -> "install"
                     },
                     Palette.accent,
                     onInstall,
@@ -564,7 +564,7 @@ internal fun AddedMark(kind: OwlKind) =
             OwlKind.App -> "✓ in your app drawer"
             OwlKind.Panel -> "✓ in gesture settings"
             // Shown only as keybar.owl, the file's name in the widgets folder.
-            OwlKind.Keys -> "✓ in your widgets folder"
+            OwlKind.Keybar -> "✓ in your widgets folder"
         },
         style = Mono.copy(color = Palette.green),
     )

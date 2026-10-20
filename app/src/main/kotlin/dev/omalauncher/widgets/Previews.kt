@@ -22,7 +22,7 @@ import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
-import dev.omalauncher.ui.KeysPreview
+import dev.omalauncher.ui.KeybarPreview
 import dev.omalauncher.ui.OwlAppWindow
 import dev.omalauncher.ui.PanelPreview
 import dev.omalauncher.ui.WidgetScreenPanel
@@ -84,7 +84,7 @@ internal class Previews(
             when (instance.program.kind) {
                 OwlKind.App -> OwlAppWindow(spec, instance)
                 OwlKind.Panel -> PanelPreview(instance)
-                OwlKind.Keys -> KeysPreview(instance)
+                OwlKind.Keybar -> KeybarPreview(instance)
                 else -> WidgetScreenPanel(spec, instance, onDismiss = {})
             }
         }

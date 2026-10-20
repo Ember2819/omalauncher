@@ -205,7 +205,7 @@ class Compiler private constructor(
         if (level > LEVEL) fail("this widget needs owl $level; the launcher supports up to $LEVEL, so update the launcher", levelField!!.pos)
         if (body.animations.isNotEmpty()) fail("animate belongs inside a node", body.animations[0].pos)
         // An app, a panel and keys check their own (onBack, onSubmit).
-        if (ast.kind != OwlKind.App && ast.kind != OwlKind.Panel && ast.kind != OwlKind.Keys) {
+        if (ast.kind != OwlKind.App && ast.kind != OwlKind.Panel && ast.kind != OwlKind.Keybar) {
             for (h in body.handlers) if (h.name != "onTap") fail("a ${ast.kind.word} only takes onTap at the top level", h.pos)
         }
 
@@ -251,7 +251,7 @@ class Compiler private constructor(
         val requires = requires(body.decls.filterIsInstance<Decl.Requires>().flatMap { it.fields })
         if (ast.kind == OwlKind.App) return app(body, meta, level, requires, globals.map { it!! }, triggers)
         if (ast.kind == OwlKind.Panel) return panel(body, meta, level, requires, globals.map { it!! }, triggers)
-        if (ast.kind == OwlKind.Keys) return keys(body, meta, level, requires, globals.map { it!! }, triggers)
+        if (ast.kind == OwlKind.Keybar) return keybar(body, meta, level, requires, globals.map { it!! }, triggers)
         // A face is a widget that fills a home page of its own, the whole screen: it gets a screen's room, and
         // has no tile's size.
         val allowed = if (isFace) FACE_PROPS else WIDGET_PROPS
@@ -453,7 +453,7 @@ class Compiler private constructor(
      * puts it there, and keeps it from taking focus, so the keyboard stays up; `pressKey(...)` and `latch(...)` reach the
      * terminal.
      */
-    private fun keys(
+    private fun keybar(
         body: Body,
         meta: Map<String, Value>,
         level: Int,
@@ -461,7 +461,7 @@ class Compiler private constructor(
         globals: List<Global>,
         triggers: List<Trigger>,
     ): Program {
-        since(KEYS_FILE, 0)
+        since(KEYBAR_FILE, 0)
         body.props.firstOrNull()?.let { fail("extra keys take no properties; the launcher puts them over the keyboard, as tall as their nodes", it.pos) }
         body.handlers.firstOrNull()?.let { fail("handlers go on the keys inside, like onPress: pressKey(\"esc\")", it.pos) }
         body.items.firstOrNull { it is Item.Node && it.type == "screen" }?.let { fail("extra keys have no screen { }: their nodes are the bar", it.pos) }
@@ -473,7 +473,7 @@ class Compiler private constructor(
         (screenAction ?: openScreen)?.let { fail("screen() and close() open and close a widget's screen { }; the extra keys come and go with the keyboard", it) }
         checkLevel(level)
         return Program(
-            name = ast.name ?: "keys",
+            name = ast.name ?: "keybar",
             meta = meta,
             level = level,
             globals = globals,

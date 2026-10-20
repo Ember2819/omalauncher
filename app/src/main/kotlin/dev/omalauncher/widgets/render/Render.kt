@@ -238,7 +238,7 @@ fun WidgetScreen(
 
 /** Extra keys (`keybar "…" { }`): their nodes over the soft keyboard, as wide as there's room for and as tall as they are. */
 @Composable
-fun WidgetKeys(
+fun WidgetKeybar(
     inst: WidgetInstance,
     modifier: Modifier = Modifier,
 ) {

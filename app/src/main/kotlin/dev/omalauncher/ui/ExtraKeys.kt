@@ -37,7 +37,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import dev.omalauncher.Runtime
-import dev.omalauncher.widgets.render.WidgetKeys
+import dev.omalauncher.widgets.render.WidgetKeybar
 import dev.omalauncher.widgets.runtime.WidgetInstance
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.coroutineScope
@@ -82,18 +82,18 @@ fun ExtraKeys(
     val widgets = runtime.widgets
     // Before the file runs too, so it's live as soon as it does.
     DisposableEffect(widgets) {
-        widgets.keysShown(true)
-        onDispose { widgets.keysShown(false) }
+        widgets.keybarShown(true)
+        onDispose { widgets.keybarShown(false) }
     }
-    val inst = widgets.keysInstance() ?: return
-    WidgetKeys(inst, modifier.fillMaxWidth())
+    val inst = widgets.keybarInstance() ?: return
+    WidgetKeybar(inst, modifier.fillMaxWidth())
 }
 
 /** The extra keys at the bottom of a screen, where the keyboard would push them up, for owl-check's picture of them. */
 @Composable
-internal fun KeysPreview(inst: WidgetInstance) {
+internal fun KeybarPreview(inst: WidgetInstance) {
     Box(Modifier.fillMaxSize().background(Palette.background).safeDrawingPadding(), contentAlignment = Alignment.BottomCenter) {
-        WidgetKeys(inst, Modifier.fillMaxWidth())
+        WidgetKeybar(inst, Modifier.fillMaxWidth())
     }
 }
 
