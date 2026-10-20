@@ -43,6 +43,7 @@ import dev.omalauncher.widgets.lang.Program
 import dev.omalauncher.widgets.lang.Sprite
 import dev.omalauncher.widgets.lang.Str
 import dev.omalauncher.widgets.lang.text
+import dev.omalauncher.widgets.lang.urlEncode
 import dev.omalauncher.widgets.lang.Value
 import dev.omalauncher.widgets.lang.Trigger
 import dev.omalauncher.widgets.lang.WidgetError
@@ -548,8 +549,12 @@ class WidgetInstance(
     }
 
     override fun report(message: String) {
-        // An error about a request's header or body could quote a secret; this goes to logcat and to Linux.
-        val message = secrets.fold(message) { m, i -> read(i).toString().takeIf { it.isNotEmpty() && read(i) != Null }?.let { m.replace(it, "•••") } ?: m }
+        // An error about a request could quote a secret, as it is or as enc(...) put it in the URL; this goes to logcat and to Linux.
+        val message =
+            secrets.fold(message) { m, i ->
+                val v = read(i).takeIf { it != Null }?.toString().orEmpty()
+                if (v.isEmpty()) m else m.replace(v, "•••").replace(urlEncode(v), "•••")
+            }
         if (reported.add(message) && reported.size < 50) {
             Log.w("widgets", "${program.name}: $message")
             onError(message)

@@ -125,10 +125,13 @@ whose `password: true` shows dots and keeps the keyboard from suggesting or lear
 
 The compiler lets a secret go only into `http(...)`'s and `post(...)`'s headers and `post`'s body
 (through anything there, like `toBase64(...)`), and into `token == null` or `token != ""` to see whether
-it's set. Showing it, putting it in a URL, a command or a notification, copying it, a trigger on it or
-assigning it to another state is a compile error. A handler may set it: `token = value` from the Input,
-`token = null` to sign out; `owl-send` can't. The server a secret goes to is written out in the URL
-(`"https://api.example.com/${enc(id)}"`), not taken from a value.
+it's set. An API that takes its key in the URL gets it as `enc(key)` there, written just so:
+`"https://api.example.com/data?appid=${enc(key)}"`. Showing it, putting it in a URL any other way, a
+command or a notification, copying it, a trigger on it or assigning it to another state is a compile
+error. A handler may set it: `token = value` from the Input, `token = null` to sign out; `owl-send`
+can't. The server a secret goes to is written out in the URL (`"https://api.example.com/${enc(id)}"`),
+not taken from a value. Prefer a header when the API takes one: servers often log the URLs they're asked
+for.
 
 ```owl
 widget "nas" {

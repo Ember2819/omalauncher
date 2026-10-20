@@ -88,13 +88,16 @@ class SecretsTest {
         instance().also { it.adopt(plain) }.let { assertEquals(Str("s3cr3t"), it.token()) }
     }
 
-    /** owl-send can't swap in a token, and an error never quotes one. */
+    /** owl-send can't swap in a token, and an error never quotes one, as it is or URL-encoded. */
     @Test fun notSetFromOutsideNorReported() {
         val errors = ArrayList<String>()
         val a = instance(errors = errors)
         assertTrue(a.setState("token", Str("theirs"))!!.contains("is a secret"))
         a.typeToken("s3cr3t")
         a.report("unknown time zone 's3cr3t'")
-        assertEquals(listOf("unknown time zone '•••'"), errors)
+        // As enc(token) put it in a URL, too.
+        a.typeToken("a b/c")
+        a.report("http GET https://pc.test/?k=a%20b%2Fc failed")
+        assertEquals(listOf("unknown time zone '•••'", "http GET https://pc.test/?k=••• failed"), errors)
     }
 }

@@ -329,6 +329,18 @@ class LangTest {
         }
         compileError(w + " on token { out = 1 }\n Text { text: 1 } }").let { assertTrue(it, it.contains("token is a secret")) }
         compileError(w + " source s = http(\"https://x.test/${'$'}{token}\")\n Text { text: 1 } }").let { assertTrue(it, it.contains("token is a secret")) }
+        // In a URL only as enc(token), for an API that takes its key in the query, on a server written out.
+        val inUrl = Compiler.compile(w + " source s = http(token == null ? null : \"https://Api.test/q?appid=${'$'}{enc(token)}\")\n onTap: post(\"https://b.test/${'$'}{enc(token)}\", {}, method: \"DELETE\")\n Text { text: 1 } }")
+        assertEquals(listOf("https://api.test", "https://b.test"), inUrl.secretHosts["token"])
+        assertTrue(inUrl.commands.toString(), inUrl.commands.none { "built from widget values" in it })
+        TestHost(inUrl).let { h ->
+            h.write(0, Str("a b"))
+            assertEquals("https://Api.test/q?appid=a%20b", (inUrl.globals.first { it.name == "s" } as Global.Source).arg!!(Env.root(h)).toString())
+        }
+        for (leak in listOf("\"https://x.test/?k=${'$'}{enc(upper(token))}\"", "\"https://${'$'}{enc(token)}.x.test/\"", "out ?? \"https://x.test/?k=${'$'}{enc(token)}\"")) {
+            assertTrue(leak, compileError("$w source s = http($leak)\n Text { text: 1 } }").contains("token is a secret"))
+        }
+        compileError(w + " Text { text: enc(token) } }").let { assertTrue(it, it.contains("token is a secret")) }
         // Bound to the servers it goes to, which are written out, so an edit can't send it elsewhere unnoticed.
         assertEquals(mapOf("token" to listOf("https://x.test")), p.secretHosts)
         compileError(w + " state h = \"x.test\"\n source s = http(\"https://${'$'}{h}/a\", {A: token})\n Text { text: 1 } }").let { assertTrue(it, it.contains("server it goes to is written out")) }

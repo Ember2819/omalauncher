@@ -553,7 +553,7 @@ object Builtins {
             // owl 6: a value as one shell word, for commands put together while the widget runs.
             "sh" to Builtin(1, 1) { a -> Str(shQuote(a[0].let { if (it == Null) "" else it.text() })) },
             // owl 8: a value as one URL component, for http(...) URLs put together while the widget runs.
-            "enc" to Builtin(1, 1) { a -> Str(URLEncoder.encode(a[0].let { if (it == Null) "" else it.text() }, "UTF-8").replace("+", "%20")) },
+            "enc" to Builtin(1, 1) { a -> Str(urlEncode(a[0].let { if (it == Null) "" else it.text() })) },
             "startsWith" to Builtin(2, 2) { a -> bool(a.str(0).startsWith(a.str(1))) },
             "endsWith" to Builtin(2, 2) { a -> bool(a.str(0).endsWith(a.str(1))) },
             "contains" to
@@ -927,3 +927,6 @@ private fun rankAlias(v: Value) = rankText(rankField(v, "alias"))
 
 /** [s] in single quotes, each `'` in it closed, escaped and reopened: bash reads it back as one word, exactly [s]. */
 fun shQuote(s: String) = "'" + s.replace("'", "'\\''") + "'"
+
+/** [s] as one URL component, spaces as %20: what enc(...) gives. */
+fun urlEncode(s: String): String = URLEncoder.encode(s, "UTF-8").replace("+", "%20")

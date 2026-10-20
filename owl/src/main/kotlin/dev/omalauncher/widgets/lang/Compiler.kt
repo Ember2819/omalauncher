@@ -97,6 +97,9 @@ class Compiler private constructor(
     /** The secrets read while compiling a request's headers and body, see [sending]. */
     private var sent: HashSet<String>? = null
 
+    /** While compiling a request's URL: the secrets that go into it, as `enc(token)`, see [requestUrl]. */
+    private var urlSent: HashSet<String>? = null
+
     /** Each secret's servers, as `https://host:port`: it's kept only while the file sends it to these. */
     private val secretHosts = HashMap<String, MutableSet<String>>()
 
@@ -129,12 +132,46 @@ class Compiler private constructor(
             } finally {
                 sent = was
             }
-        if (names.isNotEmpty()) {
-            if (shapes == null) fail("${names.first()} is a secret, so the server it goes to is written out: \"https://api.example.com/…\", not a value", e.pos)
-            val hosts = shapes.map { SERVER.find(it)?.value?.lowercase() ?: fail("${names.first()} is a secret, so the server it goes to is written out: \"https://api.example.com/…\"", e.pos) }
-            for (n in names) secretHosts.getOrPut(n) { HashSet() } += hosts
-        }
+        bind(names, shapes, e.pos)
         return ev
+    }
+
+    /** Binds secrets sent to a request to its servers, which must be written out in its URL's [shapes]. */
+    private fun bind(
+        names: Set<String>,
+        shapes: List<String>?,
+        pos: Int,
+    ) {
+        if (names.isEmpty()) return
+        val written = "${names.first()} is a secret, so the server it goes to is written out: \"https://api.example.com/…\""
+        if (shapes == null) fail("$written, not a value", pos)
+        val hosts = shapes.map { SERVER.find(it)?.value?.lowercase() ?: fail(written, pos) }
+        for (n in names) secretHosts.getOrPut(n) { HashSet() } += hosts
+    }
+
+    /**
+     * A request's URL, checked and listed for review as "[what] <url>". A secret may go into it only as `enc(token)`,
+     * for an API that takes its key in the query, on a server written out, which it's bound to like a header's.
+     */
+    private fun requestUrl(
+        what: String,
+        name: String,
+        e: Expr,
+        scope: Scope,
+    ): Pair<Ev, List<String>?> {
+        val was = urlSent
+        val names = HashSet<String>()
+        urlSent = names
+        try {
+            val url = ex(e, scope)
+            (url.const as? Str)?.v?.let { if (!it.startsWith("https://") && !it.startsWith("http://")) fail("$name takes an http:// or https:// URL", e.pos) }
+            // Like a command's sh(...) values: listed by shape when the host is fixed and each value is enc(...) or a number.
+            val shapes = listUrl(what, e, url, scope)
+            bind(names, shapes, e.pos)
+            return url to shapes
+        } finally {
+            urlSent = was
+        }
     }
 
     private val sources = HashSet<String>()
@@ -673,10 +710,7 @@ class Compiler private constructor(
         return when {
             e is Expr.Call && e.name == "http" -> {
                 if (e.args.size !in 1..2 || e.named.isNotEmpty()) fail("http(\"https://...\") takes a URL and optionally a map of headers", e.pos)
-                val url = ex(e.args[0], root)
-                (url.const as? Str)?.v?.let { if (!it.startsWith("https://") && !it.startsWith("http://")) fail("http takes an http:// or https:// URL", e.args[0].pos) }
-                // Like a command's sh(...) values: listed by shape when the host is fixed and each value is enc(...) or a number.
-                val shapes = listUrl("http GET", e.args[0], url, root)
+                val (url, shapes) = requestUrl("http GET", "http", e.args[0], root)
                 Global.Source(d.name, "http", url, (every ?: 60.0).coerceAtLeast(5.0), d.json, timeout.coerceIn(1, 300), d.status, e.args.getOrNull(1)?.let { sending(it, root, shapes) })
             }
             e is Expr.Call && e.name in setOf("cmd", "stream") -> {
@@ -1120,8 +1154,6 @@ class Compiler private constructor(
         if (call.args.size !in 1..3) fail("post(\"https://...\", body, headers) takes a URL, optionally a body and a map of headers", call.pos)
         for ((k, v) in call.named) if (k != "method") fail("post takes method: and no other named arguments", v.pos)
         since("post", call.pos)
-        val url = ex(call.args[0], scope)
-        (url.const as? Str)?.v?.let { if (!it.startsWith("https://") && !it.startsWith("http://")) fail("post takes an http:// or https:// URL", call.args[0].pos) }
         // A constant, so the reviewer reads what it does: "http DELETE https://…".
         val method =
             call.named.firstOrNull { it.first == "method" }?.second?.let { m ->
@@ -1129,7 +1161,7 @@ class Compiler private constructor(
                 (constant(m, "method") as? Str)?.v?.uppercase()?.takeIf { it in POST_METHODS }
                     ?: fail("method: is one of ${POST_METHODS.joinToString { "\"$it\"" }}", m.pos)
             } ?: "POST"
-        val shapes = listUrl("http $method", call.args[0], url, scope)
+        val (url, shapes) = requestUrl("http $method", "post", call.args[0], scope)
         val body = call.args.getOrNull(1)?.let { sending(it, scope, shapes) }
         val headers = call.args.getOrNull(2)?.let { sending(it, scope, shapes) }
         return { env ->
@@ -1352,7 +1384,7 @@ class Compiler private constructor(
             is Ref.Slot -> {
                 // Never shown, run or copied: on screen or in Linux, it would be out.
                 if (e.name in secrets) sent?.add(e.name)
-                if (e.name in secrets && !secretOk) fail("${e.name} is a secret: it only goes into http(...)'s and post(...)'s headers and body, or is compared with null or \"\"", e.pos)
+                if (e.name in secrets && !secretOk) fail("${e.name} is a secret: it only goes into http(...)'s and post(...)'s headers and body, into their URL as enc(${e.name}), or is compared with null or \"\"", e.pos)
                 return Ev(null) { env -> env.host.read(ref.index) }
             }
             null -> {}
@@ -1467,7 +1499,9 @@ class Compiler private constructor(
         if (e.args.size < b.min || e.args.size > b.max) {
             fail("${e.name} takes ${if (b.min == b.max) "${b.min}" else "${b.min}-${b.max}"} arguments, not ${e.args.size}", e.pos)
         }
-        val args = e.args.map { ex(it, s) }
+        // A secret in a request's URL, as enc(token): see [requestUrl].
+        val urlSecret = (e.args.singleOrNull() as? Expr.Name)?.takeIf { e.name == "enc" && urlSent != null && isSecret(it, s) }
+        val args = if (urlSecret != null) listOf(withSecrets { ex(urlSecret, s) }.also { urlSent!! += urlSecret.name }) else e.args.map { ex(it, s) }
         val impl = b.impl
         val run: (Env) -> Value = { env ->
             env.host.budget.tick()
