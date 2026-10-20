@@ -49,7 +49,7 @@ internal val KINDS: Map<String, Kind> =
 internal val COMMON =
     setOf(
         "width", "height", "size", "fill", "weight", "padding", "background", "border", "borderColor",
-        "radius", "opacity", "rotation", "scale", "offset", "clip", "visible", "frost",
+        "radius", "opacity", "rotation", "scale", "offset", "clip", "visible", "frost", "repeats",
     )
 
 internal val ANIMATABLE = setOf("opacity", "rotation", "scale", "value", "color", "background")
@@ -130,7 +130,9 @@ internal val SINCE =
         // owl 12: WebSockets, a server's messages as a source and messages back to it.
         listOf("ws", "send").associateWith { 12 } +
         // owl 12: a terminal's colored output, and Back for a widget or face that's holding on to something.
-        listOf("Ansi", "onGrid", TILE_BACK).associateWith { 12 }
+        listOf("Ansi", "onGrid", TILE_BACK).associateWith { 12 } +
+        // owl 12: the extra keys over the soft keyboard as a file; keys for the focused Linux window; touches as they go down.
+        listOf(KEYS_FILE, "pressKey", "typeText", "latch", "android.modifiers", "onPress", "onRelease", "repeats").associateWith { 12 }
 
 /** `state x = null secret`, named like this in [SINCE]. */
 internal const val SECRET = "secret"
@@ -150,6 +152,8 @@ internal val POST_METHODS = setOf("POST", "PUT", "DELETE")
 internal const val FACE_FILE = "face \"…\" { }"
 
 internal const val PANEL_FILE = "panel \"…\" { }"
+
+internal const val KEYS_FILE = "keybar \"…\" { }"
 
 /** A panel's read-only name for the prompt bar's text. */
 internal const val QUERY = "query"
@@ -186,6 +190,9 @@ internal val HANDLER_PARAMS =
     mapOf(
         "onTap" to listOf("x", "y"),
         "onLongPress" to listOf("x", "y"),
+        // As the finger goes down, and with `repeats: true` again while it stays: `repeat` counts from 0, the press.
+        "onPress" to listOf("x", "y", "repeat"),
+        "onRelease" to emptyList(),
         "onDrag" to listOf("dx", "dy", "x", "y"),
         "onChange" to listOf("value"),
         "onSubmit" to listOf("value"),
@@ -203,7 +210,7 @@ internal val HANDLER_KINDS = mapOf("onChange" to setOf("Slider", "Input"), "onSu
 internal val TRIGGER_PARAMS = mapOf("on" to listOf("value", "old"))
 
 /** Data from the phone and the launcher; device is fixed, system is polled, the rest update as they change. */
-internal val ANDROID = setOf("battery", "device", "media", "notifications", "volume", "system", "alarm", "modes", "apps", "agents", "recent", "drawer")
+internal val ANDROID = setOf("battery", "device", "media", "notifications", "volume", "system", "alarm", "modes", "apps", "agents", "recent", "drawer", "modifiers")
 
 /** The words an action's first value may be, when it's written out; [numbers] also allows a number. */
 internal class Words(
@@ -222,6 +229,7 @@ internal val ACTION_WORDS =
         "notification" to setOf("open", "dismiss").let { Words(it, "notification takes ${it.joinToString()} and a notification's key") },
         "appAction" to setOf("pin", "info", "uninstall", "remove", "edit", "share").let { Words(it, "appAction takes ${it.joinToString()} and an app's key") },
         "workApps" to setOf("pause", "resume", "toggle").let { Words(it, "workApps takes ${it.joinToString()}") },
+        "latch" to KeyNames.latches.toSet().let { Words(it, "latch takes ${it.joinToString()}, and optionally once, locked or off") },
     )
 
 /** The tile's size, readable anywhere a declaration of the same name doesn't shadow it. */
@@ -234,3 +242,9 @@ internal val WIDGET_PROPS = setOf("size", "minSize", "page", "order", "padding",
 
 /** A face has no tile's size; it says where it goes and whether the status bar stays over it. */
 internal val FACE_PROPS = setOf("page", "order", "padding", "background", "statusBar", "back")
+
+/** What `latch(...)`'s second value may be; without one it turns the modifier on for the next key, or off. */
+internal val LATCHES = setOf("once", "locked", "off")
+
+internal val KEY_NAMES =
+    "pressKey takes a key, ${KeyNames.names.joinToString()} or a character, with modifiers in front: \"ctrl+c\", \"shift+insert\", \"ctrl+alt+t\""
