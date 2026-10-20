@@ -1144,7 +1144,7 @@ class Compiler private constructor(
 
     /**
      * `post(url, body, headers)`, or `x = post(...)` to get the answer into the state [slot]: an HTTP POST
-     * (or `method:`'s PUT or DELETE) from Android. Its URLs are listed like http(...)'s, as "http POST <url>".
+     * (or `method:`'s PUT, PATCH or DELETE) from Android. Its URLs are listed like http(...)'s, as "http POST <url>".
      */
     private fun post(
         call: Expr.Call,

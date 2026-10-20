@@ -88,10 +88,10 @@ code. Before owl 9 the same took a null URL, which sends nothing. The URLs are l
 keep the server fixed and put values into the URL with `enc(...)`.
 
 A REST API changes and removes things with other methods than POST: `method: "PUT"` sends a PUT (to
-replace or update what's at the URL) and `method: "DELETE"` a DELETE (to remove it), both like a POST
-otherwise (owl 12). The method is written as it is, never a value, and listed for review with the URL,
-as `http DELETE https://…`. A DELETE goes without a body unless it's given one. There's no PATCH
-(Android doesn't send it); use PUT, or a POST if that's what the API takes:
+replace what's at the URL), `method: "PATCH"` a PATCH (to change some of its fields) and
+`method: "DELETE"` a DELETE (to remove it), each like a POST otherwise (owl 12). The method is written as
+it is, never a value, and listed for review with the URL, as `http DELETE https://…`. A DELETE goes
+without a body unless it's given one:
 
 ```owl
 app "todo" {

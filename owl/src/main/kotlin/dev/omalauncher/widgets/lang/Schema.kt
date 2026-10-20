@@ -134,8 +134,8 @@ internal const val SECRET = "secret"
 /** `method:` on post(...), named like this in [SINCE]. */
 internal const val POST_METHOD = "method:"
 
-/** The methods post(...) sends; Android's HttpURLConnection has no PATCH. */
-internal val POST_METHODS = setOf("POST", "PUT", "DELETE")
+/** The methods post(...) sends. */
+internal val POST_METHODS = setOf("POST", "PUT", "PATCH", "DELETE")
 
 internal const val FACE_FILE = "face \"…\" { }"
 

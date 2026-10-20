@@ -292,21 +292,21 @@ class LangTest {
         assertEquals(listOf("http POST (a URL built from widget values)"), Compiler.compile("app \"t\" {\n meta { owl: 8 }\n state u = \"\"\n back: true\n onBack: post(u)\n Text { text: 1 } }").commands)
     }
 
-    /** post's method: sends PUT or DELETE (owl 12), listed as what it is. */
+    /** post's method: sends PUT, PATCH or DELETE (owl 12), listed as what it is. */
     @Test fun postMethods() {
         val p =
             Compiler.compile(
                 "app \"t\" {\n meta { owl: 12 }\n back: true\n" +
-                    " onBack: { post(\"https://x.test/items/1\", null, {}, method: \"delete\"); post(\"https://x.test/b\", {a: 1}, {}, method: \"PUT\") }\n" +
+                    " onBack: { post(\"https://x.test/items/1\", null, {}, method: \"delete\"); post(\"https://x.test/b\", {a: 1}, {}, method: \"PUT\"); post(\"https://x.test/c\", {a: 2}, {}, method: \"patch\") }\n" +
                     " Text { text: 1 } }",
             )
         val host = TestHost(p)
         p.onBack!!.run(Env.root(host), emptyList())
-        assertEquals(listOf("post null https://x.test/items/1 null {} DELETE", "post null https://x.test/b {a: 1} {} PUT"), host.actions)
-        assertEquals(setOf("http DELETE https://x.test/items/1", "http PUT https://x.test/b"), p.commands.toSet())
+        assertEquals(listOf("post null https://x.test/items/1 null {} DELETE", "post null https://x.test/b {a: 1} {} PUT", "post null https://x.test/c {a: 2} {} PATCH"), host.actions)
+        assertEquals(setOf("http DELETE https://x.test/items/1", "http PUT https://x.test/b", "http PATCH https://x.test/c"), p.commands.toSet())
         val app = "app \"t\" {\n meta { owl: 12 }\n back: true\n onBack: post(\"https://x.test/\", null, {}, "
         assertTrue(compileError("app \"t\" {\n meta { owl: 11 }\n back: true\n onBack: post(\"https://x.test/\", null, {}, method: \"PUT\")\n Text { text: 1 } }").contains("needs owl 12"))
-        assertTrue(compileError(app + "method: \"PATCH\")\n Text { text: 1 } }").contains("method: is one of"))
+        assertTrue(compileError(app + "method: \"HEAD\")\n Text { text: 1 } }").contains("method: is one of"))
         assertTrue(compileError(app + "retries: 3)\n Text { text: 1 } }").contains("no other named arguments"))
     }
 

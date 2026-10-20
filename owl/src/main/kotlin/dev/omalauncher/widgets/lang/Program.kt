@@ -48,7 +48,7 @@ interface Host {
     /**
      * `post(url, body, headers)` in a handler: an HTTP POST, with a map or list [body] sent as JSON. With a
      * [slot] (`x = post(...)`), the answer goes there as `{code, ok, out}` when it arrives. [method] is
-     * POST, or `method:`'s PUT or DELETE.
+     * POST, or `method:`'s PUT, PATCH or DELETE.
      */
     fun post(
         url: String,
