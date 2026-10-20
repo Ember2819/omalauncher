@@ -504,7 +504,7 @@ fun EditorHome(
     val context = LocalContext.current
     val fs = runtime.proot.guestFs
     val recent by produceState(emptyList<String>()) {
-        value = withContext(Dispatchers.IO) { EditorPrefs(context).recent.filter { fs.host(it).isFile } }
+        value = withContext(Dispatchers.IO) { EditorPrefs(context).recent.filter { runCatching { fs.host(it).isFile }.getOrDefault(false) } }
     }
     var newFile by remember { mutableStateOf(false) }
 
