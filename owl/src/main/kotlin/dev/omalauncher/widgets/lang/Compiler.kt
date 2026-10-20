@@ -301,6 +301,10 @@ class Compiler private constructor(
         val tree = items(body.items, root, Children.UI)
         if (tree.isEmpty()) fail("an app needs at least one node, like Text { text: \"hi\" }", 0)
         openScreen?.let { fail("screen() opens a widget's screen { }; an app is open already, and close() closes it", it) }
+        // Before the level check, which counts what they use.
+        val title = body.props.firstOrNull { it.name == "title" }?.let { ex(it.value, root) }
+        val back = backProp?.let { ex(it.value, root) }
+        val onBack = onBackHandler?.let { handler(it, root) }
         checkLevel(level)
         return Program(
             name = ast.name ?: "app",
@@ -308,9 +312,9 @@ class Compiler private constructor(
             level = level,
             globals = globals,
             screen = tree,
-            screenTitle = body.props.firstOrNull { it.name == "title" }?.let { ex(it.value, root) },
-            back = backProp?.let { ex(it.value, root) },
-            onBack = onBackHandler?.let { handler(it, root) },
+            screenTitle = title,
+            back = back,
+            onBack = onBack,
             edge = edge,
             statusBar = statusBar,
             triggers = triggers,
@@ -355,6 +359,8 @@ class Compiler private constructor(
         openScreen?.let { fail("screen() opens a widget's screen { }; a panel is open already, and close() closes it", it) }
         val onSubmit = body.handlers.firstOrNull { it.name == "onSubmit" }?.let { handler(it, root) }
         val onKey = body.handlers.firstOrNull { it.name == "onKey" }?.let { since("onKey", it.pos); handler(it, root) }
+        // Before the level check, which counts what it uses.
+        val enter = body.props.firstOrNull { it.name == "enter" }?.let { ex(it.value, root) }
         checkLevel(level)
         return Program(
             name = ast.name ?: "panel",
@@ -364,7 +370,7 @@ class Compiler private constructor(
             screen = tree,
             onSubmit = onSubmit,
             onKey = onKey,
-            enter = body.props.firstOrNull { it.name == "enter" }?.let { ex(it.value, root) },
+            enter = enter,
             triggers = triggers,
             commands = commands.toList(),
             warnings = warnings.toList(),

@@ -943,6 +943,9 @@ class LangTest {
         assertTrue(compileError("app {\n meta { owl: 8 }\n onTap: close()\n Text { text: 1 } }").contains("handlers go on the nodes"))
         assertTrue(compileError("app {\n meta { owl: 8 }\n back: true\n Text { text: 1 } }").contains("back and onBack go together"))
         assertTrue(compileError("app {\n meta { owl: 8 }\n onBack: close()\n Text { text: 1 } }").contains("back and onBack go together"))
+        // What an app's title, back and onBack use counts toward the level it must declare.
+        assertTrue(compileError("app {\n meta { owl: 8 }\n title: capitalize(\"x\")\n Text { text: 1 } }").contains("needs owl 9"))
+        assertTrue(compileError("app {\n meta { owl: 8 }\n back: true\n onBack: { if true { close() } }\n Text { text: 1 } }").contains("needs owl 9"))
         assertTrue(compileError("app {\n meta { owl: 8 }\n screen { Text { text: 1 } } }").contains("is a screen already"))
         assertTrue(compileError("app {\n meta { owl: 8 }\n Text { text: 1; onTap: screen() } }").contains("close() closes it"))
         assertTrue(compileError("app {\n meta { owl: 8 }\n }").contains("needs at least one node"))
