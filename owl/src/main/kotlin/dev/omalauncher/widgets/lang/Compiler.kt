@@ -60,11 +60,11 @@ class Compiler private constructor(
         /** Whether a Shader's code reads its `time` uniform: only then does it need a frame clock. */
         fun shaderReadsTime(code: String) = TIME_WORD.containsMatchIn(code)
 
-        /** A URL whose scheme and host are fixed text, so no value can send it elsewhere. */
-        private val FIXED_HOST = Regex("""^https?://[A-Za-z0-9.-]+(:[0-9]+)?/""")
-
-        /** A URL's scheme, host and port, what a secret is bound to: https, and no `user@` before the host to hide where it goes. */
-        private val SERVER = Regex("""^https://[A-Za-z0-9.-]+(:[0-9]+)?(?=[/?#]|$)""")
+        /**
+         * A URL's scheme, host and port, written out so no value can send it elsewhere: what a secret is bound to. No
+         * `user@` before the host to hide where it goes, and the host ends where the text does or at a `/`, `?` or `#`.
+         */
+        private val FIXED_HOST = Regex("""^https?://[A-Za-z0-9.-]+(:[0-9]+)?(?=[/?#]|$)""")
     }
 
     /** Compile-time mirror of an [Env] frame. Only the first [visible] names resolve (lets see earlier lets only). */
@@ -94,11 +94,11 @@ class Compiler private constructor(
     /** True while compiling what a secret may go into: a request's headers and body, or a check that it's set. */
     private var secretOk = false
 
-    /** The secrets read while compiling a request's headers and body, see [sending]. */
-    private var sent: HashSet<String>? = null
+    /** While compiling a request's URL, where a secret goes only as `enc(token)`. */
+    private var inUrl = false
 
-    /** While compiling a request's URL: the secrets that go into it, as `enc(token)`, see [requestUrl]. */
-    private var urlSent: HashSet<String>? = null
+    /** The secrets a request being compiled sends, see [request]. */
+    private var sent: HashSet<String>? = null
 
     /** Each secret's servers, as `https://host:port`: it's kept only while the file sends it to these. */
     private val secretHosts = HashMap<String, MutableSet<String>>()
@@ -113,70 +113,94 @@ class Compiler private constructor(
         }
     }
 
+    /** Compiles [f], part of a request's URL, where a secret may go as `enc(token)`. */
+    private fun <T> inRequestUrl(f: () -> T): T {
+        val was = inUrl
+        inUrl = true
+        try {
+            return f()
+        } finally {
+            inUrl = was
+        }
+    }
+
+    /** Compiles [f] with secrets readable, but not sent: `token == null` only says whether it's set. */
+    private fun <T> checking(f: () -> T): T {
+        val was = sent
+        sent = null
+        try {
+            return withSecrets(f)
+        } finally {
+            sent = was
+        }
+    }
+
     /**
-     * A request's headers or body, which may hold secrets: those it reads go to the servers its URL
-     * was listed with ([shapes], null when it's built from values), which must be fixed, so an edit
-     * that sends a secret elsewhere loses it (see [Program.secretHosts]).
+     * Compiles a request's URL, headers and body in [f], and binds the secrets they send to the servers written out at
+     * the start of its [url], so an edit that sends a secret elsewhere loses it (see [Program.secretHosts]).
      */
-    private fun sending(
-        e: Expr,
+    private fun <T> request(
+        url: Expr,
         scope: Scope,
-        shapes: List<String>?,
-    ): Ev {
+        f: () -> T,
+    ): T {
         val was = sent
         val names = HashSet<String>()
         sent = names
-        val ev =
-            try {
-                withSecrets { ex(e, scope) }
-            } finally {
-                sent = was
+        try {
+            val out = f()
+            if (names.isNotEmpty()) {
+                val hosts = inRequestUrl { servers(url, scope, names.first()) }
+                for (n in names) secretHosts.getOrPut(n) { HashSet() } += hosts
             }
-        bind(names, shapes, e.pos)
-        return ev
+            return out
+        } finally {
+            sent = was
+        }
     }
 
-    /** Binds secrets sent to a request to its servers, which must be written out in its URL's [shapes]. */
-    private fun bind(
-        names: Set<String>,
-        shapes: List<String>?,
-        pos: Int,
-    ) {
-        if (names.isEmpty()) return
-        val written = "${names.first()} is a secret, so the server it goes to is written out: \"https://api.example.com/…\""
-        if (shapes == null) fail("$written, not a value", pos)
-        val hosts =
-            shapes.map {
-                if (it.startsWith("http://")) fail("${names.first()} is a secret, so it goes only to an https:// server, where nothing on the way can read it", pos)
-                SERVER.find(it)?.value?.lowercase() ?: fail(written, pos)
-            }
-        for (n in names) secretHosts.getOrPut(n) { HashSet() } += hosts
+    /** The servers a request to [e] goes to, each written out at the start of a way it can turn out, for the secret [name]. */
+    private fun servers(
+        e: Expr,
+        s: Scope,
+        name: String,
+    ): List<String> {
+        if (e is Expr.Cond) return servers(e.a, s, name) + servers(e.b, s, name)
+        // A URL that's null pauses its source: it goes nowhere.
+        if (ex(e, s).const == Null) return emptyList()
+        val host = server(e, s) ?: fail("$name is a secret, so the server it goes to is written out: \"https://api.example.com/…\", not a value", e.pos)
+        if (host.startsWith("http://")) fail("$name is a secret, so it goes only to an https:// server, where nothing on the way can read it", e.pos)
+        return listOf(host)
+    }
+
+    /** The scheme, host and port [e] starts with as fixed text ([FIXED_HOST]); null when a value can change them. */
+    private fun server(
+        e: Expr,
+        s: Scope,
+    ): String? {
+        val whole = constText(e, s)
+        val start = whole ?: constantStart(e, s)
+        // Where the text gives way to a value, the host has to have ended first: "https://api.x${v}" could go anywhere.
+        return FIXED_HOST.find(start)?.takeIf { whole != null || it.range.last + 1 < start.length }?.value?.lowercase()
     }
 
     /**
      * A request's URL, checked and listed for review as "[what] <url>". A secret may go into it only as `enc(token)`,
-     * for an API that takes its key in the query, on a server written out, which it's bound to like a header's.
+     * for an API that takes its key in the query.
      */
     private fun requestUrl(
         what: String,
         name: String,
         e: Expr,
         scope: Scope,
-    ): Pair<Ev, List<String>?> {
-        val was = urlSent
-        val names = HashSet<String>()
-        urlSent = names
-        try {
+    ): Ev =
+        inRequestUrl {
             val url = ex(e, scope)
             (url.const as? Str)?.v?.let { if (!it.startsWith("https://") && !it.startsWith("http://")) fail("$name takes an http:// or https:// URL", e.pos) }
             // Like a command's sh(...) values: listed by shape when the host is fixed and each value is enc(...) or a number.
-            val shapes = listUrl(what, e, url, scope)
-            bind(names, shapes, e.pos)
-            return url to shapes
-        } finally {
-            urlSent = was
+            listUrl(what, e, url, scope)
+            url
         }
-    }
 
     private val sources = HashSet<String>()
     private val components = HashMap<String, Component>()
@@ -717,8 +741,11 @@ class Compiler private constructor(
         return when {
             e is Expr.Call && e.name == "http" -> {
                 if (e.args.size !in 1..2 || e.named.isNotEmpty()) fail("http(\"https://...\") takes a URL and optionally a map of headers", e.pos)
-                val (url, shapes) = requestUrl("http GET", "http", e.args[0], root)
-                Global.Source(d.name, "http", url, (every ?: 60.0).coerceAtLeast(5.0), d.json, timeout.coerceIn(1, 300), d.status, e.args.getOrNull(1)?.let { sending(it, root, shapes) })
+                request(e.args[0], root) {
+                    val url = requestUrl("http GET", "http", e.args[0], root)
+                    val headers = e.args.getOrNull(1)?.let { withSecrets { ex(it, root) } }
+                    Global.Source(d.name, "http", url, (every ?: 60.0).coerceAtLeast(5.0), d.json, timeout.coerceIn(1, 300), d.status, headers)
+                }
             }
             e is Expr.Call && e.name in setOf("cmd", "stream") -> {
                 if (e.args.size != 1 || e.named.isNotEmpty()) fail("${e.name}(\"command\") takes one command", e.pos)
@@ -1168,9 +1195,14 @@ class Compiler private constructor(
                 (constant(m, "method") as? Str)?.v?.uppercase()?.takeIf { it in POST_METHODS }
                     ?: fail("method: is one of ${POST_METHODS.joinToString { "\"$it\"" }}", m.pos)
             } ?: "POST"
-        val (url, shapes) = requestUrl("http $method", "post", call.args[0], scope)
-        val body = call.args.getOrNull(1)?.let { sending(it, scope, shapes) }
-        val headers = call.args.getOrNull(2)?.let { sending(it, scope, shapes) }
+        val (url, body, headers) =
+            request(call.args[0], scope) {
+                Triple(
+                    requestUrl("http $method", "post", call.args[0], scope),
+                    call.args.getOrNull(1)?.let { withSecrets { ex(it, scope) } },
+                    call.args.getOrNull(2)?.let { withSecrets { ex(it, scope) } },
+                )
+            }
         return { env ->
             val target = url(env)
             // Like any action whose value hasn't loaded: a null URL sends nothing.
@@ -1187,7 +1219,7 @@ class Compiler private constructor(
         e: Expr,
         url: Ev,
         scope: Scope,
-    ): List<String>? {
+    ) {
         val shapes = (url.const as? Str)?.let { listOf(it.v) } ?: shapes(e, scope, "enc")?.takeIf { it.isNotEmpty() && it.all { s -> FIXED_HOST.containsMatchIn(s) } }
         if (shapes == null) {
             commands += "$what (a URL built from widget values)"
@@ -1195,7 +1227,6 @@ class Compiler private constructor(
         } else {
             shapes.forEach { commands += "$what $it" }
         }
-        return shapes
     }
 
     /**
@@ -1240,7 +1271,12 @@ class Compiler private constructor(
                 }
             return "a value in this URL isn't put through enc(), so the store's review can't show where it goes: write $fix (a number can go through int(n) or fixed(n, 4) instead; a path with / in it can't, so write its fixed parts out and enc() only the values between them)" to value.pos
         }
-        // Every value is encoded, so the server itself must come from one.
+        // Every value is encoded: so either the server comes from one, or the URL has too many ways to turn out to list.
+        fun fixed(p: Expr): Boolean = if (p is Expr.Cond) fixed(p.a) && fixed(p.b) else ex(p, s).const == Null || server(p, s) != null
+        if (fixed(e)) {
+            return "this URL can turn out more than $MAX_SHAPES ways, more than the store's review lists: write fewer ternaries into it, " +
+                "or pass the parts that vary through enc() as one value" to e.pos
+        }
         return "the server in this URL comes from a value: keep \"https://host/\" fixed text and put values after it" to e.pos
     }
 
@@ -1330,8 +1366,7 @@ class Compiler private constructor(
             is Expr.Binary -> {
                 // `token == null` says whether it's set, which a widget shows (sign in, or the data).
                 val check = (e.op == "==" || e.op == "!=") && (isSecret(e.a, s) && isUnset(e.b) || isSecret(e.b, s) && isUnset(e.a))
-                val a = if (check) withSecrets { ex(e.a, s) } else ex(e.a, s)
-                val b = if (check) withSecrets { ex(e.b, s) } else ex(e.b, s)
+                val (a, b) = if (check) checking { ex(e.a, s) to ex(e.b, s) } else ex(e.a, s) to ex(e.b, s)
                 when (e.op) {
                     // Like JS: `x || "none"` gives x when it's set.
                     "&&" -> fold(listOf(a, b)) { env -> a(env).let { if (!it.truthy) it else b(env) } }
@@ -1391,7 +1426,13 @@ class Compiler private constructor(
             is Ref.Slot -> {
                 // Never shown, run or copied: on screen or in Linux, it would be out.
                 if (e.name in secrets) sent?.add(e.name)
-                if (e.name in secrets && !secretOk) fail("${e.name} is a secret: it only goes into http(...)'s and post(...)'s headers and body, into their URL as enc(${e.name}), or is compared with null or \"\"", e.pos)
+                if (e.name in secrets && !secretOk) {
+                    fail(
+                        "${e.name} is a secret: it goes only into http(...)'s and post(...)'s headers and body, written out in them, not through a let " +
+                            "({Authorization: \"Bearer \${${e.name}}\"}), into their URL as enc(${e.name}), or into ${e.name} == null, != null or != \"\"",
+                        e.pos,
+                    )
+                }
                 return Ev(null) { env -> env.host.read(ref.index) }
             }
             null -> {}
@@ -1507,8 +1548,8 @@ class Compiler private constructor(
             fail("${e.name} takes ${if (b.min == b.max) "${b.min}" else "${b.min}-${b.max}"} arguments, not ${e.args.size}", e.pos)
         }
         // A secret in a request's URL, as enc(token): see [requestUrl].
-        val urlSecret = (e.args.singleOrNull() as? Expr.Name)?.takeIf { e.name == "enc" && urlSent != null && isSecret(it, s) }
-        val args = if (urlSecret != null) listOf(withSecrets { ex(urlSecret, s) }.also { urlSent!! += urlSecret.name }) else e.args.map { ex(it, s) }
+        val urlSecret = (e.args.singleOrNull() as? Expr.Name)?.takeIf { e.name == "enc" && inUrl && isSecret(it, s) }
+        val args = if (urlSecret != null) listOf(withSecrets { ex(urlSecret, s) }) else e.args.map { ex(it, s) }
         val impl = b.impl
         val run: (Env) -> Value = { env ->
             env.host.budget.tick()

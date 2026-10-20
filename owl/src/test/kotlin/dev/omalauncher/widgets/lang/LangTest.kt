@@ -349,6 +349,14 @@ class LangTest {
         compileError(w + " onTap: post(\"http://x.test/a\", {t: token})\n Text { text: 1 } }").let { assertTrue(it, it.contains("only to an https:// server")) }
         // A user name before the host would bind it to "x.test@evil.test", and send it to evil.test.
         compileError(w + " onTap: post(\"https://x.test@evil.test/a\", {t: token})\n Text { text: 1 } }").let { assertTrue(it, it.contains("server it goes to is written out")) }
+        // Bound to the server written out at the URL's start, whatever follows it: a value not through enc(), more ways than are listed.
+        val many = "${'$'}{out == null ? \"a\" : \"b\"}".repeat(4)
+        for (url in listOf("\"https://x.test/${'$'}{out}\"", "\"https://x.test/$many\"", "\"https://x.test?k=${'$'}{enc(token)}\"")) {
+            assertEquals(url, listOf("https://x.test"), Compiler.compile("$w source s = http($url, {A: token})\n Text { text: 1 } }").secretHosts["token"])
+        }
+        compileError(w + " source s = http(\"https://x.test${'$'}{out}\", {A: token})\n Text { text: 1 } }").let { assertTrue(it, it.contains("server it goes to is written out")) }
+        // A let can't hold it; the error says to write it out where it's sent.
+        compileError(w + " let auth = \"Bearer ${'$'}{token}\"\n Text { text: 1 } }").let { assertTrue(it, it.contains("not through a let")) }
         compileError("widget {\n meta { owl: 12 }\n state token = null secret persist\n Text { text: 1 } }").let { assertTrue(it, it.contains("without persist")) }
         compileError("widget {\n meta { owl: 11 }\n state token = null secret\n Text { text: 1 } }").let { assertTrue(it, it.contains("secret needs owl 12")) }
     }
@@ -931,6 +939,10 @@ class LangTest {
         assertEquals(KeyNames.Combo(1, emptyList()), KeyNames.combo("esc"))
         assertEquals(KeyNames.Combo(46, listOf(29)), KeyNames.combo("ctrl+c"))
         assertEquals(KeyNames.Combo(46, listOf(29)), KeyNames.combo("CTRL+c"))
+        // Ctrl+C as people write it, not Ctrl+Shift+C (a terminal's copy); a capital alone is still shifted.
+        assertEquals(KeyNames.Combo(46, listOf(29)), KeyNames.combo("ctrl+C"))
+        assertEquals(KeyNames.Combo(46, listOf(29, 42)), KeyNames.combo("ctrl+shift+c"))
+        assertEquals(KeyNames.Combo(30, listOf(42)), KeyNames.combo("A"))
         assertEquals(KeyNames.Combo(110, listOf(42)), KeyNames.combo("shift+insert"))
         assertEquals(KeyNames.Combo(20, listOf(29, 56)), KeyNames.combo("ctrl+alt+t"))
         // A shifted character holds Shift itself; + on its own, or last after a +, is the key.
@@ -1278,6 +1290,11 @@ class LangTest {
         assertTrue(warnings("\"https://a.b/${'$'}{sh(v)}\"").single().contains("enc(...) instead of sh(...)"))
         assertTrue(warnings("\"https://${'$'}{enc(v)}/x\"").single().contains("the server in this URL comes from a value"))
         assertEquals(emptyList<String>(), warnings("\"https://a.b/${'$'}{enc(v)}\""))
+        // A query right after the host, with no path, is a fixed server too.
+        assertEquals(emptyList<String>(), warnings("\"https://a.b?q=${'$'}{enc(v)}\""))
+        // Too many ways to list isn't a server from a value.
+        val many = "${'$'}{v == \"\" ? \"a\" : \"b\"}".repeat(4)
+        assertTrue(warnings("\"https://a.b/$many\"").single().contains("more than 8 ways"))
         // The whole URL from a value: enc() would break it, so the fix is to write it out.
         assertTrue(warnings("v").single().contains("this URL is all a value (v)"))
         assertTrue(warnings("v == \"\" ? null : v").single().contains("this URL is all a value"))
