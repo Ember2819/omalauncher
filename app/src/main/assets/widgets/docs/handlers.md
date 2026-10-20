@@ -51,7 +51,7 @@ after it in its block (and blocks inside them), and needs a name not used for a 
 | `url("https://...")` | opens in the Android browser. Other links open in the app that takes them: `tel:` the dialer, `geo:` maps, `mailto:` email |
 | `share(text)` | opens Android's share sheet with the text (owl 7) |
 | `haptic()` | a short tap of haptic feedback, if the user has touch feedback on (owl 7) |
-| `pressKey("ctrl+c")` | presses a key in the Linux window being typed in (a terminal tile, or a Linux app's window: a terminal or a graphical app), with any modifiers latched on the extra keys held too: a name, `esc`, `tab`, `enter`, `backspace`, `delete`, `insert`, `space`, `home`, `end`, `pgup`, `pgdn`, `up`, `down`, `left`, `right`, `f1`…`f12`, or a character on a US keyboard (`/`, `A`, `:`), after any of `ctrl+`, `alt+`, `shift+` and `super+`. Nothing happens while no Linux window has the keyboard, and a tap on another tile takes it from a terminal tile first: a key on home works from the extra keys, or from a widget's own tile next to its `Terminal`, not from another tile or an app. Only from a touch, not in a trigger; the store's reviewer sees which keys. See docs/keybar.md (owl 12) |
+| `pressKey("ctrl+c")` | presses a key in the Linux window being typed in (a terminal tile, or a Linux app's window: a terminal or a graphical app), with any modifiers latched on the extra keys held too: a name, `esc`, `tab`, `enter`, `backspace`, `delete`, `insert`, `space`, `home`, `end`, `pgup`, `pgdn`, `up`, `down`, `left`, `right`, `f1`…`f12`, or a character on a US keyboard (`/`, `A`, `:`), after any of `ctrl+`, `alt+`, `shift+` and `super+`; a letter after them is the key as written on it, so `ctrl+C` is Ctrl+C, and Ctrl+Shift+C is `ctrl+shift+c`. Nothing happens while no Linux window has the keyboard, and a tap on another tile takes it from a terminal tile first: a key on home works from the extra keys, or from a widget's own tile next to its `Terminal`, not from another tile or an app. Only from a touch, not in a trigger; the store's reviewer sees which keys. See docs/keybar.md (owl 12) |
 | `typeText("git status\n")` | types the text into the same window, as the keyboard would, latched modifiers and all; `\n` is Enter (owl 12) |
 | `latch("ctrl")` | holds `ctrl`, `alt` or `shift` for the next key, the extra keys' or the keyboard's, or lets it go if it's held; `latch("ctrl", "locked")` holds it until set `off`, and `"once"` or `"off"` set it so. `android.modifiers` says how each is held (owl 12) |
 | `sound("https://…/a.mp3")` | plays a sound once, in place of the one playing; `sound("stop")` stops it. Takes a URL, an asset or a file, like `Image`; see Sounds (owl 8) |
@@ -101,8 +101,8 @@ app "todo" {
     for i in items ?? [] {
       Row {
         Text { text: i.title; weight: 1 }
-        Text { text: i.done ? "☑" : "☐"; onTap: post("https://api.example.com/items/${enc(i.id)}", {title: i.title, done: !i.done}, {}, method: "PUT") }
-        Text { text: "✕"; onTap: post("https://api.example.com/items/${enc(i.id)}", null, {}, method: "DELETE") }
+        Text { text: i.done ? "☑" : "☐"; onTap: post("https://api.example.com/items/${enc(i.id)}", {title: i.title, done: !i.done}, method: "PUT") }
+        Text { text: "✕"; onTap: post("https://api.example.com/items/${enc(i.id)}", null, method: "DELETE") }
       }
     }
   }
@@ -124,12 +124,12 @@ the widget never holds it. Never write a token into the file itself either: ask 
 whose `password: true` shows dots and keeps the keyboard from suggesting or learning what's typed.
 
 The compiler lets a secret go only into `http(...)`'s and `post(...)`'s headers and `post`'s body
-(through anything there, like `toBase64(...)`), and into `token == null` or `token != ""` to see whether
-it's set. An API that takes its key in the URL gets it as `enc(key)` there, written just so:
+(through anything there, like `toBase64(...)`), written out at each call, since a `let` can't hold it,
+and into `token == null`, `token != null` or `token != ""` to see whether it's set. An API that takes its key in the URL gets it as `enc(key)` there, written just so:
 `"https://api.example.com/data?appid=${enc(key)}"`. Showing it, putting it in a URL any other way, a
 command or a notification, copying it, a trigger on it or assigning it to another state is a compile
 error. A handler may set it: `token = value` from the Input, `token = null` to sign out; `owl-send`
-can't. The server a secret goes to is written out in the URL (`"https://api.example.com/${enc(id)}"`),
+can't, so owl-check's preview shows the widget signed out, and the user types the token in on the phone. The server a secret goes to is written out in the URL (`"https://api.example.com/${enc(id)}"`),
 not taken from a value, and it's an `https://` one. Prefer a header when the API takes one: servers often log the URLs they're asked
 for.
 

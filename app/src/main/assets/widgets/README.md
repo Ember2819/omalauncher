@@ -71,7 +71,8 @@ A file holds declarations, then the nodes it shows:
   `Slider`, `Input`, `Canvas`, `Shader`, `Terminal` and `Spacer` show things. Every node takes `width`, `height`,
   `weight`, `fill`, `padding`, `background`, `radius`, `visible` and more.
 - Handlers, like `onTap: count = count + 1`, set state and run actions: `terminal("btop")`, `run("cmd")`,
-  `url("https://...")`, `notify("title", "text")`, `post(url, body)`.
+  `url("https://...")`, `notify("title", "text")`, `post(url, body)`. An API key or a token is a
+  `state key = null secret`, typed in on the phone.
 - Text interpolates (`"${round(pct)}%"`). What's missing is `null`, never an error, and shows as `…`; `a ?? b` is b
   while a is null. Lists have `map`, `filter`, `sortBy` and the rest. Colors are the theme's names (`accent`,
   `foreground`, `muted`, `red`, ...), so widgets follow theme changes.
@@ -81,7 +82,7 @@ A file holds declarations, then the nodes it shows:
 ## The docs
 
 The rest is in `docs/`. Read the ones for what you're making before you write: a widget usually needs
-declarations.md and nodes.md, a face, an app, a panel or extra keys their own file too.
+declarations.md, nodes.md, expressions.md and handlers.md; a face, an app, a panel or extra keys their own file too.
 
 | read | for |
 |---|---|
@@ -113,12 +114,13 @@ OWL looks like QML and JavaScript but isn't either; these are what code written 
 - `on x { }` doesn't run for x's first value, so to save what a source fetched the first time, write `on x first { }` (owl 9).
 - `Progress`, `Ring`, `Slider` and other nodes with a default size lose it once they have `width`, `height`, `size`, `fill` or `weight`: `Progress { fill: width }` is zero high. A Progress is full width already; leave `fill` off, or give it a `height`.
 - In a handler each statement sees the writes before it: read what a later statement needs before changing it.
+- Never write an API key, a token or a password into the file: keep it in `state key = null secret`, asked for with `Input { password: true }`, and write it out in each request's headers, `{Authorization: "Bearer ${key}"}`, or as `enc(key)` in its URL; a `let` can't hold it (owl 12, see Tokens and passwords in docs/handlers.md).
 - `random()` and `shuffle(list)` only work in handlers and a state's first value; for values that look random but stay put, use `hash` (see Chance in docs/expressions.md).
 
 ## Examples
 
-Read the one closest to what you're making before you start. Files at the top of this folder are on
-home already; the rest are in `examples/`, off home until you move one up into this folder. Examples without `meta { owl: … }` are written for owl 1,
+Read the one closest to what you're making before you start. Files at the top of this folder are in use
+already (on home, or as the drawer and the extra keys); the rest are in `examples/`, off home until you move one up into this folder. Examples without `meta { owl: … }` are written for owl 1,
 so they don't use what came later, like `if` in handlers or a Row's Texts as wide as their text; the
 docs say what's current.
 
@@ -135,7 +137,7 @@ docs say what's current.
 | panels and the prompt bar | `drawer.owl` (lazy lists, search with rank, Popup), `examples/65-ai-bar` (android.agents, ask, open) |
 | extra keys | `keybar.owl`, `examples/keybar-layers` (latch, layers), `examples/keybar-vim`, `examples/keybar-gamepad`, `examples/keybar-commands` (typeText) |
 | a live terminal | `45-terminal` |
-| an app that sends | `examples/ntfy` (two views with `back`, a source whose URL takes a state, `post` with a JSON body, and what it answers shown at once) |
+| an app that sends | `examples/ntfy` (two views with `back`, a source whose URL takes a state, `post` with a JSON body, and what it answers shown at once), `examples/github-inbox` (a token kept as a `secret`, `post` with `method: "PATCH"`) |
 
 ## Limits
 
@@ -155,4 +157,4 @@ and the message goes to `.errors/`.
 - A `Text` without `width`, `weight` or `fill` takes the full width, except in a `Row` or `Flow` since owl 10,
   where it's as wide as its text, or in an unsized Column in one since owl 11. Before owl 10, give the Texts next to a `weight: 1` one a `width`, or the
   weighted one is squeezed to nothing.
-- Look at the examples for patterns: Examples, near the top, says which one shows what.
+- Look at the examples for patterns: Examples, above, says which one shows what.
