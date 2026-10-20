@@ -30,7 +30,7 @@ class SecretsTest {
             }
         } as Services
 
-    private fun instance(saved: File) = WidgetInstance(program, services, {}, saved)
+    private fun instance(saved: File) = WidgetInstance(program, services, {}, saved, File(saved.path.removeSuffix(".json") + ".secret"))
 
     /** A secret survives a restart in its own sealed file, never in the persisted values; unset, the file goes. */
     @Test fun keptSealedApartFromPersistedValues() {

@@ -16,16 +16,17 @@ import javax.crypto.spec.GCMParameterSpec
 object SecretBox {
     private const val ALIAS = "owl-secrets"
     private const val IV = 12
+    private const val CIPHER = "AES/GCM/NoPadding"
 
     fun seal(plain: ByteArray): ByteArray? =
         runCatching {
-            val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply { init(Cipher.ENCRYPT_MODE, key()) }
+            val cipher = Cipher.getInstance(CIPHER).apply { init(Cipher.ENCRYPT_MODE, key()) }
             cipher.iv + cipher.doFinal(plain)
         }.onFailure { Log.w(TAG, "can't encrypt", it) }.getOrNull()
 
     fun unseal(sealed: ByteArray): ByteArray? =
         runCatching {
-            val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply { init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, sealed, 0, IV)) }
+            val cipher = Cipher.getInstance(CIPHER).apply { init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, sealed, 0, IV)) }
             cipher.doFinal(sealed, IV, sealed.size - IV)
         }.onFailure { Log.w(TAG, "can't decrypt", it) }.getOrNull()
 

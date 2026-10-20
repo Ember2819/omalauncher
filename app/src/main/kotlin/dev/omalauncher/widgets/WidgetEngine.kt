@@ -306,7 +306,7 @@ class WidgetEngine(
      * of); null when Back is home's own. Read in composition, it follows the widget's state.
      */
     fun holdingBack(pages: List<Int>): WidgetInstance? =
-        specs.filter { onHome(it) && it.page in pages }.firstNotNullOfOrNull { s -> instance(s)?.takeIf { it.canGoUp() } }
+        specs.firstNotNullOfOrNull { s -> if (onHome(s) && s.page in pages) instance(s)?.takeIf { it.canGoUp() } else null }
 
     /** The page on screen; widgets on it and its neighbours stay live, the rest pause. */
     var activePage by mutableIntStateOf(1)
@@ -597,6 +597,7 @@ class WidgetEngine(
                     services,
                     { message -> writeError(spec.file, message, append = true) },
                     File(stateDir, "$name.json"),
+                    File(stateDir, "$name.secret"),
                     onScreen = { open ->
                         when {
                             program.kind == OwlKind.App -> if (!open) appCloses.tryEmit(name)

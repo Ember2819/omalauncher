@@ -369,7 +369,7 @@ class LangTest {
         assertEquals(listOf("send 2 {type: viewport, columns: 80, auth: tk}", "send 3 ping"), host.actions)
 
         val w = "widget {\n meta { owl: 12 }\n"
-        compileError(w + " source s = ws(\"https://x.test/\")\n Text { text: s } }").let { assertTrue(it, it.contains("wss:// or ws://")) }
+        compileError(w + " source s = ws(\"https://x.test/\")\n Text { text: s } }").let { assertTrue(it, it.contains("ws:// or wss://")) }
         compileError(w + " source s = ws(\"wss://x.test/\") every 5s\n Text { text: s } }").let { assertTrue(it, it.contains("no every or timeout")) }
         compileError(w + " source s = http(\"https://x.test/\")\n Text { text: 1; onTap: send(s, 1) } }").let { assertTrue(it, it.contains("send's first value is a ws(...) source")) }
         compileError(w + " source s = ws(\"wss://x.test/\")\n Text { text: 1; onTap: send(s) } }").let { assertTrue(it, it.contains("takes a ws(...) source and a message")) }
@@ -631,6 +631,9 @@ class LangTest {
         // Unknown names, values of the wrong shape and unreadable files restore nothing.
         assertEquals(emptyMap<Int, Value>(), PersistedValues.decode(p, "{\"v\":1,\"savedAt\":1000,\"values\":{\"old\":1,\"h\":3}}", 1001.0))
         assertEquals(emptyMap<Int, Value>(), PersistedValues.decode(p, "not json", 1001.0))
+        // A source that doesn't poll, like a file or a WebSocket, doesn't make every history too old.
+        val f = Compiler.compile("widget \"t\" {\nmeta { owl: 4 }\nsource x = clock every 10s\nsource c = file(\"/tmp/c\")\nlet h = history(x, 5) persist\nText { text: c }\n}")
+        assertEquals(mapOf(2 to hist), PersistedValues.decode(f, PersistedValues.encode(f, listOf(hist), 1000), 1010.0))
     }
 
     @Test fun jsonWritesWhatItReads() {

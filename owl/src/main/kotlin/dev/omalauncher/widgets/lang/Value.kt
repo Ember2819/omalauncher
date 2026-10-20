@@ -122,6 +122,12 @@ fun Value.text(): String =
         else -> toString()
     }
 
+/** A request's headers, a map's fields as text; anything else is none. */
+fun Value?.headerMap(): Map<String, String> = (this as? Obj)?.fields.orEmpty().mapValues { it.value.toString() }
+
+/** Its text, or null when it's unset, like a `pin:` that's null until paired. */
+fun Value?.textOrNull(): String? = this?.takeIf { it != Null }?.toString()
+
 class WidgetError(
     message: String,
 ) : RuntimeException(message)

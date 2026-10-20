@@ -109,7 +109,6 @@ import java.io.File
 import java.io.IOException
 import java.net.URL
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
@@ -689,16 +688,12 @@ class WidgetServices(
                     val ws = WebSocket.connect(url, headers, pinned)
                     socket.set(ws)
                     if (gone.get()) return@thread ws.cancel()
-                    // Handlers send on the main thread, where Android allows no network; in order, on a thread of their own.
-                    val writer = Executors.newSingleThreadExecutor { r -> Thread(r, "owl-ws-send").apply { isDaemon = true } }
-                    try {
-                        opened { text ->
-                            // Shut down once the connection ended, a moment before the widget hears of it.
-                            ws.isOpen && runCatching { writer.execute { ws.send(text) } }.isSuccess
-                        }
-                        ws.listen(onText)
-                    } finally {
-                        writer.shutdown()
+                    // Handlers send on the main thread; WebSocket writes on a thread of its own.
+                    opened(ws::send)
+                    val closed = ws.listen(onText)
+                    // Going away (a server restarting) or no code is how a connection ends; anything else says why.
+                    if (closed.code !in setOf(1000, 1001, 1005)) {
+                        throw IOException("the server closed it with ${closed.code}" + closed.reason.ifEmpty { null }?.let { ": $it" }.orEmpty())
                     }
                     cont.resume(Unit)
                 } catch (e: Exception) {

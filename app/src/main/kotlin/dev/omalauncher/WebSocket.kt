@@ -14,6 +14,8 @@ import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Base64
 import java.util.concurrent.Executors
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.HostnameVerifier
 import javax.net.ssl.HttpsURLConnection
@@ -26,7 +28,8 @@ import kotlin.concurrent.thread
 /**
  * A WebSocket client (RFC 6455): text and binary messages, without extensions, subprotocols, proxies or
  * redirects. [connect] does the handshake; [listen] then reads on the caller's thread until the connection
- * ends, while [send] and [close] may be called from any thread. scripts/autobahn.sh runs it through the
+ * ends, while [send], [close] and [cancel] may be called from any thread, Android's main thread too: they
+ * return at once and leave the network to threads of their own. scripts/autobahn.sh runs it through the
  * Autobahn TestSuite.
  */
 class WebSocket private constructor(
@@ -56,6 +59,11 @@ class WebSocket private constructor(
 
     /** A ping is out and nothing has arrived since. */
     private var pingSent = false
+
+    /** Writes [send]'s messages and the close frames, in order, on a thread that goes when it's idle. */
+    private val writer =
+        ThreadPoolExecutor(1, 1, 10, TimeUnit.SECONDS, LinkedBlockingQueue()) { r -> Thread(r, "websocket-send").apply { isDaemon = true } }
+            .apply { allowCoreThreadTimeOut(true) }
 
     /**
      * Reads messages until the connection ends, handing each to [onText] or [onBinary] on this thread, and
@@ -137,27 +145,26 @@ class WebSocket private constructor(
     /** No close frame went out yet and the connection isn't broken. */
     val isOpen get() = !closeSent && !socket.isClosed
 
-    /** Sends a text message; false once the connection is closing or broken. */
-    fun send(text: String) = write(TEXT, text.toByteArray(Charsets.UTF_8))
+    /** Queues a text message; false once the connection is closing or broken. */
+    fun send(text: String) = queue(TEXT, text.toByteArray(Charsets.UTF_8))
 
-    /** Sends a binary message; false once the connection is closing or broken. */
-    fun send(bytes: ByteArray) = write(BINARY, bytes)
+    /** Queues a binary message; false once the connection is closing or broken. */
+    fun send(bytes: ByteArray) = queue(BINARY, bytes)
 
     /**
      * Starts the close handshake with [code] and [reason] (at most 123 bytes of it); [listen] returns when
      * the server answers. A server that doesn't, or a write stuck on a dead connection, is cut off after
-     * [CLOSE_WAIT_MS]. Returns at once: the frame goes out on a thread of its own, so the main thread, where
-     * Android allows no network, may call it.
+     * [CLOSE_WAIT_MS]. The frame follows the messages queued before it.
      */
     fun close(
         code: Int = 1000,
         reason: String = "",
     ) {
         scheduler.schedule({ cancel() }, CLOSE_WAIT_MS, TimeUnit.MILLISECONDS)
-        thread(name = "websocket-close", isDaemon = true) { write(CLOSE, closePayload(code, reason)) }
+        queue(CLOSE, closePayload(code, reason))
     }
 
-    /** Drops the connection without a close handshake; [listen] throws. Like [close], from any thread. */
+    /** Drops the connection without a close handshake; [listen] throws. */
     fun cancel() {
         thread(name = "websocket-close", isDaemon = true) { socket.close() }
     }
@@ -174,7 +181,8 @@ class WebSocket private constructor(
         val reason = payload.copyOfRange(minOf(2, payload.size), payload.size)
         val utf8 = Utf8()
         if (!utf8.feed(reason, reason.size) || !utf8.complete) fail(1007, "a close reason that isn't UTF-8")
-        write(CLOSE, if (code == 1005) ByteArray(0) else payload.copyOf(2))
+        // Queued, so it follows what we're still sending, like echoes of the server's last messages.
+        queue(CLOSE, if (code == 1005) ByteArray(0) else payload.copyOf(2))
         // The server ends the TCP connection (RFC 6455 7.1.1); give it a moment, then end it ourselves.
         try {
             socket.soTimeout = CLOSE_WAIT_MS.toInt()
@@ -194,6 +202,16 @@ class WebSocket private constructor(
         write(CLOSE, closePayload(code, why))
         socket.close()
         throw ProtocolException(code, "the server sent $why")
+    }
+
+    /** Hands a frame to [writer]; false if the connection is closing or broken. */
+    private fun queue(
+        opcode: Int,
+        payload: ByteArray,
+    ): Boolean {
+        if (!isOpen) return false
+        writer.execute { write(opcode, payload) }
+        return true
     }
 
     /** Sends one masked frame; false if a close frame went out before it or the connection broke. */

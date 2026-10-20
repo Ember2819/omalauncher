@@ -140,7 +140,7 @@ internal const val SECRET = "secret"
 /** `back` and `onBack` on a widget or a face, named like this in [SINCE]; apps have had them since owl 8. */
 internal const val TILE_BACK = "back and onBack on a widget or face"
 
-/** `pin:` on http(...) and post(...), named like this in [SINCE]. */
+/** `pin:` on http(...), post(...) and ws(...), named like this in [SINCE]. */
 internal const val HTTP_PIN = "pin:"
 
 /** `method:` on post(...), named like this in [SINCE]. */

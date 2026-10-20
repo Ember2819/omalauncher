@@ -46,6 +46,8 @@ import dev.omalauncher.widgets.lang.Value
 import dev.omalauncher.widgets.lang.Trigger
 import dev.omalauncher.widgets.lang.WidgetError
 import dev.omalauncher.widgets.lang.bool
+import dev.omalauncher.widgets.lang.headerMap
+import dev.omalauncher.widgets.lang.textOrNull
 import dev.omalauncher.widgets.lang.num
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -188,6 +190,8 @@ class WidgetInstance(
     private val onError: (String) -> Unit,
     /** Where `persist` state and histories are kept between runs. */
     private val savedFile: File? = null,
+    /** Where `secret` state is kept between runs, sealed by [Services.seal]. */
+    private val secretFile: File? = null,
     /** screen() and close(): opens or closes the widget's screen { }. */
     private val onScreen: (Boolean) -> Unit = {},
     /** Linux is installed and running; `optional` sources wait for it. Snapshot state. */
@@ -236,10 +240,8 @@ class WidgetInstance(
 
     private var lastSaved: List<Value>? = null
 
-    /** Slots of `state ... secret`, kept beside [savedFile], sealed by [Services.seal]. */
+    /** Slots of `state ... secret`, kept in [secretFile]. */
     private val secrets = program.globals.indices.filter { (program.globals[it] as? Global.State)?.secret == true }
-
-    private val secretFile = savedFile?.let { File(it.path.removeSuffix(".json") + ".secret") }
 
     private var lastSealed: List<Value>? = null
 
@@ -719,45 +721,45 @@ class WidgetInstance(
         }
         snapshotFlow {
             val url = eval(g.arg!!, root, g.name)
-            val headers = (g.headers?.let { eval(it, root, g.name) } as? Obj)?.fields.orEmpty().mapValues { it.value.toString() }
-            val pin = g.pin?.let { eval(it, root, g.name) }?.takeIf { it != Null }?.toString()
-            Triple(url, headers, pin)
+            Triple(url, g.headers?.let { eval(it, root, g.name) }.headerMap(), g.pin?.let { eval(it, root, g.name) }.textOrNull())
         }.collectLatest { (url, headers, pin) ->
             if (url == Null) return@collectLatest status(false, "")
             val job = currentCoroutineContext()[Job]
             var wait = WS_RETRY_MS
             while (true) {
                 val began = System.currentTimeMillis()
-                val err =
-                    try {
-                        services.webSocket(
-                            url.toString(),
-                            headers,
-                            pin,
-                            opened = { send ->
-                                // A connection that opened just as the page left is already closing.
-                                if (job?.isActive != false) {
-                                    senders[slot] = send
-                                    status(true, "")
-                                }
-                            },
-                            onText = { text ->
+                // The server ending it with 1000 isn't an error, though it may end each one at once.
+                var err = ""
+                try {
+                    services.webSocket(
+                        url.toString(),
+                        headers,
+                        pin,
+                        opened = { send ->
+                            // A connection that opened just as the page left is already closing.
+                            if (job?.isActive != false) {
+                                senders[slot] = send
+                                status(true, "")
+                            }
+                        },
+                        onText = { text ->
+                            if (g.status) {
                                 out = if (g.json) Json.parseOrText(text) else Str(text)
-                                if (g.status) status(true, "") else write(slot, out)
+                                status(true, "")
                                 sample(g)
-                            },
-                        )
-                        // The server closed it; not an error, though it may end each one at once.
-                        ""
-                    } catch (e: java.io.IOException) {
-                        e.message ?: e.toString()
-                    } finally {
-                        senders.remove(slot)
-                        // Closed as the page left too, so `when x.open` greets the next connection.
-                        status(false, "")
-                    }
-                if (err.isNotEmpty()) status(false, err)
-                if (!g.status && err.isNotEmpty()) report("${g.name}: $err")
+                            } else {
+                                set(slot, g, text)
+                            }
+                        },
+                    )
+                } catch (e: java.io.IOException) {
+                    err = e.message ?: e.toString()
+                    if (!g.status) report("${g.name}: $err")
+                } finally {
+                    senders.remove(slot)
+                    // Closed as the page left too, so `when x.open` greets the next connection.
+                    status(false, err)
+                }
                 // A connection that held for a while starts the waits over; one that keeps failing waits up to a minute.
                 if (System.currentTimeMillis() - began > WS_STEADY_MS) wait = WS_RETRY_MS
                 delay(wait)
@@ -1010,9 +1012,8 @@ class WidgetInstance(
                     try {
                         val r =
                             if (g.kind == "http") {
-                                val headers = (g.headers?.let { eval(it, root, g.name) } as? Obj)?.fields.orEmpty().mapValues { it.value.toString() }
-                                val pin = g.pin?.let { eval(it, root, g.name) }?.takeIf { it != Null }?.toString()
-                                services.http(target, headers, g.timeout, pin = pin)
+                                val headers = g.headers?.let { eval(it, root, g.name) }.headerMap()
+                                services.http(target, headers, g.timeout, pin = g.pin?.let { eval(it, root, g.name) }.textOrNull())
                             } else {
                                 services.cmd(target, g.timeout)
                             }

@@ -85,7 +85,7 @@ that read it redraw. Properties are separated by newlines or `;`.
 | `source kb = android.modifiers` | how the extra keys hold each modifier: `{ctrl, alt, shift}`, each `off`, `once` (for the next key, tapped or typed) or `locked` (until it's set off). `latch(...)` sets them; see Extra keys (owl 12) |
 | `source m = android.modes` | the phone's modes: `{dnd, saver, ringer, torch}`, updated as they change. `dnd` is Do Not Disturb in any form, `saver` battery saver, `ringer` is `normal`, `vibrate` or `silent`, and `torch` is null on a phone without a flash. Switch the torch with `torch(...)` (owl 7) |
 | `state x = 0` | a value that handlers can change. Add `persist` to keep it across restarts: `state endsAt = 0 persist` |
-| `state token = null secret` | a token or password: kept across restarts encrypted, never in the persisted values, and it only goes into `http(...)`'s and `post(...)`'s headers and body, or `token == null` (or `!= ""`) to see whether it's set; anything else that reads it is an error. See Sending (owl 12) |
+| `state token = null secret` | a token or password: kept across restarts encrypted, never in the persisted values, and it only goes into `http(...)`'s, `post(...)`'s and `ws(...)`'s headers, `post`'s body and `send`'s message, or `token == null` (or `!= ""`) to see whether it's set; anything else that reads it is an error. See Sending (owl 12) |
 | `let x = expr` | a derived value, recomputed only when what it reads changes. It can use sources, state and earlier lets |
 | `let h = history(x, 60)` | the last 60 values of `x`, sampled whenever a source updates (for Sparkline). With `persist` it survives restarts, unless it's older than it would take to fill |
 | `let p = prev(x)` | the previous value of `x`, for rates: `let rate = (bytes - p) / 5` |
@@ -553,14 +553,14 @@ keep the server fixed and put values into the URL with `enc(...)`.
 https://…` (owl 12). Android has no PATCH.
 
 A server on your network with a certificate of its own (self-signed, as a NAS, a router or a desktop app
-makes one) isn't trusted by Android. `pin:` on `http(...)` or `post(...)` trusts that one certificate,
+makes one) isn't trusted by Android. `pin:` on `http(...)`, `post(...)` or `ws(...)` trusts that one certificate,
 by its SHA-256, and nothing else, at whatever address it answers (owl 12):
 
 ```owl
 widget "pc" {
   meta { owl: 12 }
-  state token = "" persist
-  source pc = http("https://192.168.1.20:8759/api/status", {Authorization: "Bearer ${token}"}, pin: "3F:A1:5C:0B:6E:2D:88:41:9A:C7:13:F0:52:BE:64:D9:07:A3:1E:C8:95:4F:2B:D6:70:18:E3:AC:59:06:B4:9C") every 10s json
+  state token = null secret
+  source pc = http(token == null ? null : "https://192.168.1.20:8759/api/status", {Authorization: "Bearer ${token}"}, pin: "3F:A1:5C:0B:6E:2D:88:41:9A:C7:13:F0:52:BE:64:D9:07:A3:1E:C8:95:4F:2B:D6:70:18:E3:AC:59:06:B4:9C") every 10s json
   Text { text: pc.hostname ?? "…" }
 }
 ```
@@ -616,7 +616,8 @@ app "agent" {
 
 With `status`, the value is `{out, open, err}`: `out` keeps the last message while it reconnects, `open`
 says whether it's connected (a `when term.open { ... }` greets each new connection), and `err` why the
-last one failed, which isn't reported as an error then. Messages are text, up to 1 MB each; binary ones
+last one failed (a server ending it with a code other than 1000 or 1001 counts, as in `the server closed
+it with 4001: bad token`), which isn't reported as an error then. Messages are text, up to 1 MB each; binary ones
 are skipped. Each message replaces the last, so a server that sends changes rather than whole states
 needs an `on term { ... }` that adds them up in a state. A connection quiet for 30 s is pinged, and
 one that doesn't answer in another 30 s counts as dropped. At most 8 are open at once, all widgets

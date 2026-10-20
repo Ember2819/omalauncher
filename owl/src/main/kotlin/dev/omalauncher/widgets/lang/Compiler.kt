@@ -234,7 +234,7 @@ class Compiler private constructor(
         val screen = screens.firstOrNull()?.let { screen(it) }
         val onTap = body.handlers.firstOrNull { it.name == "onTap" }?.let { handler(it, root) }
         // While `back` holds and its page shows, Back runs onBack: a terminal let go, a view stepped out of.
-        val (back, onBack) = back(body)?.also { since(TILE_BACK, body.props.first { it.name == "back" }.pos) } ?: (null to null)
+        val (back, onBack) = back(body, TILE_BACK)
         if (screen == null) screenAction?.let { fail("screen() and close() need a screen { } block in the widget", it) }
         val background = props["background"]?.let { if (gradient(it.value)) since(GRADIENT_BACKGROUND, it.pos); ex(it.value, root) }
         // Whether the status bar stays over a face, read as it changes: a face can hide it for a game and bring it back.
@@ -326,7 +326,7 @@ class Compiler private constructor(
         // Before the level check, which counts what they use.
         val title = body.props.firstOrNull { it.name == "title" }?.let { ex(it.value, root) }
         // Back goes up a level inside the app while `back` is true, and closes it otherwise.
-        val (back, onBack) = back(body) ?: (null to null)
+        val (back, onBack) = back(body)
         checkLevel(level)
         return Program(
             name = ast.name ?: "app",
@@ -448,17 +448,23 @@ class Compiler private constructor(
         )
     }
 
-    /** `back` and `onBack`, which go together: when Back is the file's own, and what it does then. */
-    private fun backPair(body: Body): Pair<Prop, Handler>? {
+    /**
+     * `back` and `onBack`, which go together: when Back is the file's own, and what it does then. [level] is
+     * the owl level they need, when it isn't the file's own kind's.
+     */
+    private fun back(
+        body: Body,
+        level: String? = null,
+    ): Pair<Ev?, Action?> {
         val backProp = body.props.firstOrNull { it.name == "back" }
         val onBackHandler = body.handlers.firstOrNull { it.name == "onBack" }
         if ((backProp == null) != (onBackHandler == null)) {
             fail("back and onBack go together: back: view != \"list\" says when Back goes up a level, onBack: view = \"list\" does it", (backProp?.pos ?: onBackHandler!!.pos))
         }
-        return backProp?.let { it to onBackHandler!! }
+        if (backProp == null || onBackHandler == null) return null to null
+        level?.let { since(it, backProp.pos) }
+        return ex(backProp.value, root) to handler(onBackHandler, root)
     }
-
-    private fun back(body: Body): Pair<Ev, Action>? = backPair(body)?.let { (p, h) -> ex(p.value, root) to handler(h, root) }
 
     /** The screen { } block: its nodes, and its title if it sets one. */
     private fun screen(n: Item.Node): Pair<List<WNode>, Ev?> {
@@ -640,25 +646,14 @@ class Compiler private constructor(
         val timeout = d.timeout?.let { constant(it, "timeout").num()?.toInt() } ?: 10
         return when {
             e is Expr.Call && e.name == "http" -> {
-                if (e.args.size !in 1..2) fail("http(\"https://...\") takes a URL and optionally a map of headers", e.pos)
-                for ((k, v) in e.named) if (k != "pin") fail("http takes pin: and no other named arguments", v.pos)
-                val url = ex(e.args[0], root)
-                (url.const as? Str)?.v?.let { if (!it.startsWith("https://") && !it.startsWith("http://")) fail("http takes an http:// or https:// URL", e.args[0].pos) }
-                // Like a command's sh(...) values: listed by shape when the host is fixed and each value is enc(...) or a number.
-                listUrl("http GET", e.args[0], url, root)
-                val pin = pin(e, url, root)
-                Global.Source(d.name, "http", url, (every ?: 60.0).coerceAtLeast(5.0), d.json, timeout.coerceIn(1, 300), d.status, e.args.getOrNull(1)?.let { withSecrets { ex(it, root) } }, pin)
+                val (url, headers, pin) = request(e, "http GET", "http://", "https://")
+                Global.Source(d.name, "http", url, (every ?: 60.0).coerceAtLeast(5.0), d.json, timeout.coerceIn(1, 300), d.status, headers, pin)
             }
             e is Expr.Call && e.name == "ws" -> {
-                if (e.args.size !in 1..2) fail("ws(\"wss://...\") takes a URL and optionally a map of headers", e.pos)
-                for ((k, v) in e.named) if (k != "pin") fail("ws takes pin: and no other named arguments", v.pos)
                 if (d.every != null || d.timeout != null) fail("ws(...) listens for messages; it takes no every or timeout", d.pos)
                 since("ws", e.pos)
-                val url = ex(e.args[0], root)
-                (url.const as? Str)?.v?.let { if (!it.startsWith("wss://") && !it.startsWith("ws://")) fail("ws takes a wss:// or ws:// URL", e.args[0].pos) }
-                listUrl("websocket", e.args[0], url, root)
-                val pin = pin(e, url, root)
-                Global.Source(d.name, "ws", url, 0.0, d.json, 0, d.status, e.args.getOrNull(1)?.let { withSecrets { ex(it, root) } }, pin)
+                val (url, headers, pin) = request(e, "websocket", "ws://", "wss://")
+                Global.Source(d.name, "ws", url, 0.0, d.json, 0, d.status, headers, pin)
             }
             e is Expr.Call && e.name in setOf("cmd", "stream") -> {
                 if (e.args.size != 1 || e.named.isNotEmpty()) fail("${e.name}(\"command\") takes one command", e.pos)
@@ -1100,10 +1095,8 @@ class Compiler private constructor(
         slot: Int?,
     ): (Env) -> Unit {
         if (call.args.size !in 1..3) fail("post(\"https://...\", body, headers) takes a URL, optionally a body and a map of headers", call.pos)
-        for ((k, v) in call.named) if (k != "pin" && k != "method") fail("post takes pin: and method:, and no other named arguments", v.pos)
+        onlyNamed(call, "pin", "method")
         since("post", call.pos)
-        val url = ex(call.args[0], scope)
-        (url.const as? Str)?.v?.let { if (!it.startsWith("https://") && !it.startsWith("http://")) fail("post takes an http:// or https:// URL", call.args[0].pos) }
         // A constant, so the reviewer reads what it does: "http DELETE https://…".
         val method =
             call.named.firstOrNull { it.first == "method" }?.second?.let { m ->
@@ -1111,7 +1104,7 @@ class Compiler private constructor(
                 (constant(m, "method").let { it as? Str }?.v?.uppercase())?.takeIf { it in POST_METHODS }
                     ?: fail("method: is one of ${POST_METHODS.joinToString { "\"$it\"" }}", m.pos)
             } ?: "POST"
-        listUrl("http $method", call.args[0], url, scope)
+        val url = url(call, scope, "http $method", "http://", "https://")
         val body = call.args.getOrNull(1)?.let { withSecrets { ex(it, scope) } }
         val headers = call.args.getOrNull(2)?.let { withSecrets { ex(it, scope) } }
         val pin = pin(call, url, scope)
@@ -1119,8 +1112,7 @@ class Compiler private constructor(
             val target = url(env)
             // Like any action whose value hasn't loaded: a null URL sends nothing.
             if (target != Null) {
-                val h = (headers?.invoke(env) as? Obj)?.fields.orEmpty().mapValues { it.value.toString() }
-                env.host.post(target.toString(), body?.invoke(env) ?: Null, h, slot, method, pin?.invoke(env)?.takeIf { it != Null }?.toString())
+                env.host.post(target.toString(), body?.invoke(env) ?: Null, headers?.invoke(env).headerMap(), slot, method, pin?.invoke(env).textOrNull())
             }
         }
     }
@@ -1142,6 +1134,43 @@ class Compiler private constructor(
         }
         val message = withSecrets { ex(call.args[1], scope) }
         return { env -> env.host.send(slot, message(env)) }
+    }
+
+    /**
+     * http(...)'s or ws(...)'s URL, headers and pin: the URL as [url] checks it, the headers able to take a
+     * secret.
+     */
+    private fun request(
+        call: Expr.Call,
+        listAs: String,
+        vararg schemes: String,
+    ): Triple<Ev, Ev?, Ev?> {
+        if (call.args.size !in 1..2) fail("${call.name}(\"${schemes.last()}...\") takes a URL and optionally a map of headers", call.pos)
+        onlyNamed(call, "pin")
+        val url = url(call, root, listAs, *schemes)
+        return Triple(url, call.args.getOrNull(1)?.let { withSecrets { ex(it, root) } }, pin(call, url, root))
+    }
+
+    /** [call]'s first argument, a URL that starts with one of [schemes] if it's a constant, listed for the reviewer as [listAs]. */
+    private fun url(
+        call: Expr.Call,
+        scope: Scope,
+        listAs: String,
+        vararg schemes: String,
+    ): Ev {
+        val url = ex(call.args[0], scope)
+        (url.const as? Str)?.v?.let { v -> if (schemes.none { v.startsWith(it) }) fail("${call.name} takes a ${schemes.joinToString(" or ")} URL", call.args[0].pos) }
+        // Like a command's sh(...) values: listed by shape when the host is fixed and each value is enc(...) or a number.
+        listUrl(listAs, call.args[0], url, scope)
+        return url
+    }
+
+    /** Fails on a named argument of [call] other than [allowed]. */
+    private fun onlyNamed(
+        call: Expr.Call,
+        vararg allowed: String,
+    ) {
+        for ((k, v) in call.named) if (k !in allowed) fail("${call.name} takes ${allowed.joinToString(" and ") { "$it:" }}, and no other named arguments", v.pos)
     }
 
     /**
@@ -1309,8 +1338,7 @@ class Compiler private constructor(
             is Expr.Binary -> {
                 // `token == null` says whether it's set, which a widget shows (sign in, or the data).
                 val check = (e.op == "==" || e.op == "!=") && (isSecret(e.a, s) && isUnset(e.b) || isSecret(e.b, s) && isUnset(e.a))
-                val a = if (check) withSecrets { ex(e.a, s) } else ex(e.a, s)
-                val b = if (check) withSecrets { ex(e.b, s) } else ex(e.b, s)
+                val (a, b) = if (check) withSecrets { ex(e.a, s) to ex(e.b, s) } else ex(e.a, s) to ex(e.b, s)
                 when (e.op) {
                     // Like JS: `x || "none"` gives x when it's set.
                     "&&" -> fold(listOf(a, b)) { env -> a(env).let { if (!it.truthy) it else b(env) } }
