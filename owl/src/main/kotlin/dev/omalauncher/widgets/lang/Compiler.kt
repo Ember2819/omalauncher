@@ -873,7 +873,7 @@ class Compiler private constructor(
     ): WNode {
         val body = n.body
         if (body.items.isNotEmpty()) fail("${n.type} takes no child nodes", body.items[0].pos)
-        if (body.handlers.isNotEmpty() || body.animations.isNotEmpty()) fail("put handlers and animate inside the component", n.pos)
+        if (body.handlers.isNotEmpty() || body.animations.isNotEmpty()) fail("put handlers and animate inside the component, or wrap it: Box { onTap: …; ${n.type} { … } }", n.pos)
         val given = body.props.associateBy { it.name }
         for (p in body.props) if (p.name !in c.params && p.name !in COMMON) fail("${n.type} has no parameter '${p.name}' (${c.params.joinToString()})", p.pos)
         val args =
@@ -1302,8 +1302,48 @@ class Compiler private constructor(
             since(QUERY, e.pos)
             return Ev(null) { env -> env.host.tile(QUERY) }
         }
-        if (e.name in ENUMS.values.flatten()) fail("'${e.name}' isn't a value here", e.pos)
-        fail("unknown name '${e.name}'", e.pos)
+        ENUMS.entries.firstOrNull { e.name in it.value }?.let { (prop, _) ->
+            fail("'${e.name}' isn't a value here: a word like it stands alone, as in $prop: ${e.name}; in an expression, quote it: x ? \"${e.name}\" : …", e.pos)
+        }
+        fail("unknown name '${e.name}'" + (letHint(e.name, s)?.let { ": $it" } ?: ""), e.pos)
+    }
+
+    /** Why a let by this name can't be read from here, when there is one. */
+    private fun letHint(
+        name: String,
+        scope: Scope,
+    ): String? {
+        var f: Scope? = scope
+        while (f != null) {
+            if (name in f.names.subList(f.visible, f.names.size)) return "it's declared below; a let reads only the lets above it, so move it up"
+            f = f.parent
+        }
+        if (ast.body.decls.any { it is Decl.Let && it.name == name }) return "it's declared below; a let reads only the lets above it, so move it up"
+        if (name in nodeLets) {
+            return "it's a let inside a node, which only the nodes inside that one see, not the node's own properties or anything outside it; put the let on the parent"
+        }
+        return null
+    }
+
+    /** Every let written inside a node, anywhere in the file, for [letHint]. */
+    private val nodeLets: Set<String> by lazy {
+        val names = HashSet<String>()
+
+        fun walk(b: Body?) {
+            if (b == null) return
+            for (i in b.items) {
+                when (i) {
+                    is Item.Let -> names += i.name
+                    is Item.Node -> walk(i.body)
+                    is Item.If -> walk(i.then).also { walk(i.orElse) }
+                    is Item.For -> walk(i.body)
+                    is Item.Call -> walk(i.body)
+                }
+            }
+            for (d in b.decls) if (d is Decl.Component) walk(d.body)
+        }
+        walk(ast.body)
+        names
     }
 
     /** Evaluates at compile time when every input is constant. */
@@ -1324,7 +1364,12 @@ class Compiler private constructor(
         if (e.name in Builtins.actions) fail("${e.name}(...) is an action; use it in a handler like onTap", e.pos)
         if (e.name in setOf("history", "prev")) fail("${e.name}(...) keeps samples over time, so it only works as: let x = ${e.name}(...)", e.pos)
         if (e.name in setOf("cmd", "stream", "http", "file")) fail("${e.name}(...) is a source: source x = ${e.name}(\"...\")", e.pos)
-        val b = Builtins.all[e.name] ?: fail("unknown function '${e.name}'", e.pos)
+        val b =
+            Builtins.all[e.name] ?: run {
+                val isLet = ast.body.decls.any { it is Decl.Let && it.name == e.name } || e.name in nodeLets || lookup(e.name, s) is Ref.Local
+                val hint = if (isLet) ": '${e.name}' is a let, and a let can't be called; write the expression out where it's used, or make a component for nodes you repeat" else ""
+                fail("unknown function '${e.name}'$hint", e.pos)
+            }
         since(e.name, e.pos)
         if (e.name == "fmtTime" && e.args.size > 2) since(FMT_TIME_ZONE, e.pos)
         if (e.name == "flatten" && e.args.size > 1) since(FLATTEN_DEPTH, e.pos)
