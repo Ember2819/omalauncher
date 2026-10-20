@@ -1392,12 +1392,13 @@ class Compiler private constructor(
         name: String,
         scope: Scope,
     ): String? {
+        val below = "it's declared below; a let reads only the lets above it, so move it up"
         var f: Scope? = scope
         while (f != null) {
-            if (name in f.names.subList(f.visible, f.names.size)) return "it's declared below; a let reads only the lets above it, so move it up"
+            if (name in f.names.subList(f.visible, f.names.size)) return below
             f = f.parent
         }
-        if (ast.body.decls.any { it is Decl.Let && it.name == name }) return "it's declared below; a let reads only the lets above it, so move it up"
+        if (ast.body.decls.any { it is Decl.Let && it.name == name }) return below
         if (name in nodeLets) {
             return "it's a let inside a node, which only the nodes inside that one see, not the node's own properties or anything outside it; put the let on the parent"
         }

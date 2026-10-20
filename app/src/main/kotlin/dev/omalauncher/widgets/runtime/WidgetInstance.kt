@@ -258,7 +258,8 @@ class WidgetInstance(
     /** The servers [name] is sent to, as kept with it. */
     private fun hosts(name: String): Value = Lst(program.secretHosts[name].orEmpty().map { Str(it) })
 
-    /** Writes the secrets, sealed, if they changed; all unset deletes the file. */
+    /** Writes the secrets, sealed, if they changed; all unset deletes the file. From the writer and from [stop], so one at a time. */
+    @Synchronized
     private fun seal(values: List<Value>) {
         val file = secretFile ?: return
         if (values == lastSealed) return
