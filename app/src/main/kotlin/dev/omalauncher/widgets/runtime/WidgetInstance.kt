@@ -295,7 +295,8 @@ class WidgetInstance(
         lastSaved = persisted.map { read(it) }
     }
 
-    /** Writes the persisted values if they changed since the last write. */
+    /** Writes the persisted values if they changed since the last write. From the writer and from [stop], so one at a time. */
+    @Synchronized
     private fun save(values: List<Value>) {
         val file = savedFile ?: return
         if (values == lastSaved) return

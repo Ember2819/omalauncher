@@ -94,9 +94,10 @@ internal class WidgetImages(
             val remote = src.startsWith("https://")
             // The cache keeps a downloaded image fresh; one that loaded stays for as long as the widget runs.
             if (remote && images[src] != null) return@launch
-            val file = if (src.startsWith("asset:") || remote) null else services.guestFile(src)
             val decoded =
                 withContext(Dispatchers.IO) {
+                    // Resolved as the guest sees it: a stat per part of the path, so off the main thread too.
+                    val file = if (src.startsWith("asset:") || remote) null else services.guestFile(src)
                     val stamp = file?.lastModified() ?: 0L
                     if (!remote && stamps[src] == stamp) return@withContext null
                     stamps[src] = stamp
