@@ -15,6 +15,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
@@ -37,6 +39,15 @@ fun hexColor(hex: String?): Color? {
     }
 }
 
+/** WCAG's contrast ratio of two colors, from 1 (the same) to 21 (black on white). */
+private fun contrast(
+    a: Color,
+    b: Color,
+): Float {
+    val (light, dark) = listOf(a.luminance(), b.luminance()).sortedDescending()
+    return (light + 0.05f) / (dark + 0.05f)
+}
+
 /** A theme's colors, parsed once when it's applied rather than on every read. */
 @Immutable
 class ThemePalette(
@@ -55,7 +66,11 @@ class ThemePalette(
     val surface = color("lighter_background", 0xFF24283B)
     val overlay = background.copy(alpha = 0.9f)
     val foreground = color("foreground", 0xFFC0CAF5)
-    val muted = color("dark_foreground", 0xFF565F89)
+    val muted =
+        color("dark_foreground", 0xFF565F89).let { m ->
+            // Subtitles sit on the surface: White's dark_foreground is its lighter_background too, which hid them.
+            if (contrast(m, surface) < 1.2f) lerp(foreground, background, 0.5f) else m
+        }
     val accent = color("accent", 0xFF7AA2F7)
     val border = color("muted", 0xFF414868)
     val red = color("red", 0xFFF7768E)
