@@ -708,6 +708,27 @@ class LangTest {
         assertEquals("[1, 2, 3]", text("matchAll(s, \"\\\\d\")", "state s = \"1a2b3\""))
     }
 
+    /** -0.0 is zero and nothing compares with NaN, on both the fast path and the general one. */
+    @Test fun negativeZeroAndNaNCompareAsNumbers() {
+        val d = "state x = 0\nstate t = \"-0\"\nstate nan = \"NaN\""
+        assertEquals("false", text("-x < 0", d))
+        assertEquals("false", text("x * -1 < 0", d))
+        assertEquals("true", text("-x >= 0", d))
+        assertEquals("false", text("t < 0", d))
+        assertEquals("false", text("nan > 5", d))
+        assertEquals("false", text("nan < 5", d))
+        assertEquals("false", text("num(nan) > 5", d))
+        assertEquals("[-1, 0, 2]", text("sort([2, -x, -1])", d))
+    }
+
+    @Test fun formattingWhatIsNoNumberGivesNull() {
+        val d = "meta { owl: 9 }\nstate z = 0"
+        assertEquals("null", text("fmtTime(num(\"NaN\") + z, \"HH:mm\")", d))
+        assertEquals("null", text("fmtNum(num(\"NaN\") + z)", d))
+        assertEquals("null", text("parseTime(\"2026-01-01T00:00:00+99:99\")", d))
+        assertEquals("1767225600", text("parseTime(\"2026-01-01T00:00:00Z\")", d))
+    }
+
     /** A URL, command or image src with a value still loading waits for it, rather than asking with "…" in it. */
     @Test fun aRequestWaitsForEveryPartOfIt() {
         val p =

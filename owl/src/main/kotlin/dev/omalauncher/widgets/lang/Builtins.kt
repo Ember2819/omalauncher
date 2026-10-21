@@ -115,7 +115,8 @@ object Builtins {
         // Numeric text compares as numbers: command output is always text.
         val x = a.num()
         val y = b.num()
-        return if (x != null && y != null) x.compareTo(y) else a.toString().compareTo(b.toString())
+        // + 0.0 makes -0.0 zero: Double.compareTo orders it below 0, so -(a - b) < 0 held for a == b.
+        return if (x != null && y != null) (x + 0.0).compareTo(y + 0.0) else a.toString().compareTo(b.toString())
     }
 
     /** ARGB of any color-like value: theme names, #hex strings, colors. */
@@ -320,7 +321,8 @@ object Builtins {
             val offset = g.last().uppercase()
             val at = runCatching { LocalDateTime.of(part(1), part(2), part(3), part(4), part(5), part(6), nanos) }.getOrNull() ?: return Null
             // ZoneOffset reads Z, +02, +0200 and +02:00.
-            return epoch(at.atZone(if (offset == "") zone else ZoneOffset.of(offset)))
+            // An offset past ±18:00 (+99:99) isn't one: null, like any text that isn't a date, rather than an error.
+            return epoch(at.atZone(if (offset == "") zone else runCatching { ZoneOffset.of(offset) }.getOrNull() ?: return Null))
         }
         val named = s.substringAfterLast(' ')
         val rfc = rfc822Zones[named.uppercase()]?.let { s.dropLast(named.length) + it } ?: s
@@ -678,7 +680,8 @@ object Builtins {
                     )
                 }.strict(),
             // fmtTime(epochSeconds, "HH:mm"): java.time patterns in the phone's time zone; owl 9 takes a zone and a language too.
-            "fmtTime" to Builtin(2, 4) { a -> Str(fmtTime(a.num(0), a.str(1), zone(a[2]), a.str(3))) }.strict(),
+            // NaN and infinity aren't times: null, as for a value still loading, rather than 1970's midnight.
+            "fmtTime" to Builtin(2, 4) { a -> if (!a.num(0).isFinite()) Null else Str(fmtTime(a.num(0), a.str(1), zone(a[2]), a.str(3))) }.strict(),
             // owl 9: parseTime("2026-10-17T10:04:00Z") is Unix seconds, null if the text isn't a date.
             // Not folded: a time without a date is today's, and one without a zone the phone's.
             "parseTime" to Builtin(1, 3, pure = false) { a -> parseTime(a.str(0), a.str(1), zone(a[2])) }.strict(),
@@ -687,6 +690,8 @@ object Builtins {
             // owl 9: fmtNum(x, digits) or fmtNum(x, {digits, compact, sign}). Not folded: it's in the phone's language.
             "fmtNum" to
                 Builtin(1, 2, pure = false) { a ->
+                    // NaN and infinity showed as 0.
+                    if (!a.num(0).isFinite()) return@Builtin Null
                     when (val o = a[1]) {
                         is Obj -> Str(fmtNum(a.num(0), o.fields["digits"]?.num()?.toInt(), o.fields["compact"]?.truthy == true, o.fields["sign"]?.truthy == true))
                         Null -> Str(fmtNum(a.num(0), null, false, false))
@@ -975,8 +980,10 @@ object Builtins {
     private inline fun comparison(crossinline f: (Int) -> Boolean): (Value, Value) -> Value =
         { a, b ->
             when {
-                a is Num && b is Num -> bool(f(a.v.compareTo(b.v)))
+                // Nothing compares with NaN ("NaN" is a number): compareTo puts it above everything.
+                a is Num && b is Num -> if (a.v.isNaN() || b.v.isNaN()) FALSE else bool(f((a.v + 0.0).compareTo(b.v + 0.0)))
                 a == Null || b == Null -> FALSE
+                a.num()?.isNaN() == true || b.num()?.isNaN() == true -> FALSE
                 else -> bool(f(compare(a, b)))
             }
         }
