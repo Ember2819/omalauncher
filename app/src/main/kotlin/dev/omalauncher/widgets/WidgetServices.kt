@@ -109,6 +109,9 @@ import java.util.concurrent.ConcurrentHashMap
 
 private const val MAX_HTTP_BYTES = 1 shl 20
 
+/** Why a request whose response is over [MAX_HTTP_BYTES] failed; it isn't tried again any sooner than its interval. */
+internal const val HTTP_TOO_BIG = "the response is over 1 MB, more than a widget reads"
+
 private const val MAX_REDIRECTS = 5
 
 private val REDIRECTS = setOf(301, 302, 303, 307, 308)
@@ -634,8 +637,11 @@ class WidgetServices(
                             return@repeat
                         }
                         val stream = if (code >= 400) connection.errorStream else connection.inputStream
-                        // Widgets show a few values; a runaway response mustn't fill memory.
-                        val text = stream?.use { String(it.readUpTo(MAX_HTTP_BYTES), Charsets.UTF_8) }.orEmpty()
+                        // Widgets show a few values; a runaway response mustn't fill memory. One cut short would read as
+                        // what the server said, or as broken JSON taken for text: it fails instead.
+                        val bytes = stream?.use { it.readUpTo(MAX_HTTP_BYTES + 1) } ?: ByteArray(0)
+                        if (bytes.size > MAX_HTTP_BYTES) return@withContext ShellResult("", HTTP_TOO_BIG, -1)
+                        val text = String(bytes, Charsets.UTF_8)
                         return@withContext if (code in 200..299) ShellResult(text.trimEnd(), "", code) else ShellResult(text.trimEnd(), connection.responseMessage.orEmpty(), code)
                     } finally {
                         connection.disconnect()

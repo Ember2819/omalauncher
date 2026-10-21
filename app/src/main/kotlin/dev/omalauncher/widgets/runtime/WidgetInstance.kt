@@ -26,6 +26,7 @@ import dev.omalauncher.linux.ShellResult
 import dev.omalauncher.ui.EmbeddedTerminal
 import dev.omalauncher.ui.LauncherStyle
 import dev.omalauncher.ui.Palette
+import dev.omalauncher.widgets.HTTP_TOO_BIG
 import dev.omalauncher.widgets.lang.Budget
 import dev.omalauncher.widgets.lang.Env
 import dev.omalauncher.widgets.lang.Ev
@@ -969,7 +970,8 @@ class WidgetInstance(
                             }
                         // Up to a megabyte of JSON: parsed off the main thread.
                         val out = if (g.json) withContext(Dispatchers.Default) { Json.parseOrText(r.out) } else Str(r.out)
-                        fetched = g.kind != "http" || ok(g, r)
+                        // A response too big now is as big in 30 seconds.
+                        fetched = g.kind != "http" || ok(g, r) || r.err == HTTP_TOO_BIG
                         if (g.status) {
                             Obj(mapOf("out" to out, "err" to Str(r.err), "code" to Num(r.code.toDouble()), "ok" to bool(ok(g, r))))
                         } else {
