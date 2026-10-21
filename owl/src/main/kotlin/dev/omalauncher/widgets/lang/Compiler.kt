@@ -544,15 +544,15 @@ class Compiler private constructor(
         triggers: List<Trigger>,
     ): Program {
         since(KEYBAR_FILE, 0)
-        body.props.firstOrNull()?.let { fail("extra keys take no properties; the launcher puts them over the keyboard, as tall as their nodes", it.pos) }
+        body.props.firstOrNull()?.let { fail("a key bar takes no properties; the launcher puts it over the keyboard, as tall as its nodes", it.pos) }
         body.handlers.firstOrNull()?.let { fail("handlers go on the keys inside, like onPress: pressKey(\"esc\")", it.pos) }
-        body.items.firstOrNull { it is Item.Node && it.type == "screen" }?.let { fail("extra keys have no screen { }: their nodes are the bar", it.pos) }
+        body.items.firstOrNull { it is Item.Node && it.type == "screen" }?.let { fail("a key bar has no screen { }: its nodes are the bar", it.pos) }
         nodes = 0
         maxNodes = MAX_SCREEN_NODES
         inScreen = true
         val tree = items(body.items, root, Children.UI)
-        if (tree.isEmpty()) fail("extra keys need at least one node, like Button { text: \"esc\"; onPress: pressKey(\"esc\") }", 0)
-        (screenAction ?: openScreen)?.let { fail("screen() and close() open and close a widget's screen { }; the extra keys come and go with the keyboard", it) }
+        if (tree.isEmpty()) fail("a key bar needs at least one node, like Button { text: \"esc\"; onPress: pressKey(\"esc\") }", 0)
+        (screenAction ?: openScreen)?.let { fail("screen() and close() open and close a widget's screen { }; the key bar comes and goes with the keyboard", it) }
         checkLevel(level)
         return Program(
             name = ast.name ?: "keybar",

@@ -1027,10 +1027,10 @@ class LangTest {
         assertEquals(listOf("pressKey up", "pressKey up", "latch ctrl, locked"), host.actions)
 
         assertTrue(compileError("keybar {\n meta { owl: 11 }\n Text { text: 1 } }").contains("needs owl 12"))
-        assertTrue(compileError("keybar {\n meta { owl: 12 }\n size: 2x2\n Text { text: 1 } }").contains("take no properties"))
+        assertTrue(compileError("keybar {\n meta { owl: 12 }\n size: 2x2\n Text { text: 1 } }").contains("takes no properties"))
         assertTrue(compileError("keybar {\n meta { owl: 12 }\n onTap: pressKey(\"esc\")\n Text { text: 1 } }").contains("handlers go on the keys"))
         assertTrue(compileError("keybar {\n meta { owl: 12 }\n screen { Text { text: 1 } } }").contains("no screen { }"))
-        assertTrue(compileError("keybar {\n meta { owl: 12 }\n Text { text: 1; onTap: close() } }").contains("come and go with the keyboard"))
+        assertTrue(compileError("keybar {\n meta { owl: 12 }\n Text { text: 1; onTap: close() } }").contains("comes and goes with the keyboard"))
         assertTrue(compileError("keybar {\n meta { owl: 12 }\n Text { text: 1; repeats: true; onTap: pressKey(\"up\") } }").contains("add onPress"))
         assertTrue(compileError("keybar {\n meta { owl: 12 }\n Text { text: 1; onTap: pressKey(\"ctrl+escape\") } }").contains("pressKey takes a key"))
         assertTrue(compileError("keybar {\n meta { owl: 12 }\n Text { text: 1; onTap: latch(\"super\") } }").contains("latch takes ctrl, alt, shift"))

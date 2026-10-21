@@ -752,7 +752,7 @@ class WidgetEngine(
             "preview-skipped $hash " +
                 when (spec.kind) {
                     OwlKind.Panel -> "a panel has no tile"
-                    OwlKind.Keybar -> "extra keys have no tile"
+                    OwlKind.Keybar -> "the terminal key bar has no tile"
                     else -> "an app has no tile"
                 }
         writeCheck(spec.file, hash, "ok", if (ok) "$tile\nscreen $hash ${dm.widthPixels}x${dm.heightPixels}" else "$tile; rendering its screen failed")
@@ -1043,8 +1043,8 @@ class WidgetEngine(
                 "app drawer (`app \"name\" { }`) and panels that swiping up or down on home opens (`panel \"name\" { }`, picked with " +
                 "gestures.swipe-up and gestures.swipe-down in ~/${StyleStore.GUEST_DIR}/style.toml). The app drawer is the panel " +
                 "drawer.owl there: to change the drawer, edit it; .stock-drawer.owl is the drawer as this launcher ships it. " +
-                "Likewise keybar.owl (`keybar \"name\" { }`) is the extra keys over the soft keyboard while typing in a terminal, " +
-                "and .stock-keybar.owl the keys as shipped. " +
+                "Likewise keybar.owl (`keybar \"name\" { }`) is the terminal key bar over the soft keyboard while typing in a terminal, " +
+                "and .stock-keybar.owl the bar as shipped. " +
                 "Saved files show up on the phone within seconds. After saving, run `owl-check <file>`: it prints the errors " +
                 "and the path of a PNG of the tile or view, drawn with live data; look at it to check the layout. " +
                 "examples/ holds more widgets to learn from or move up to use. Scripts, cron jobs and hooks can set a running " +

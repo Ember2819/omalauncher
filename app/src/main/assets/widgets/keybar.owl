@@ -1,9 +1,9 @@
-keybar "extra keys" {
+keybar "terminal key bar" {
   // The keys a phone keyboard lacks, over it while you type in a terminal: on home and in a Linux app's window. They're
   // yours to change: ask your agent to edit them. .stock-keybar.owl next to it is this file as the launcher ships it, kept
   // up to date: compare the two to see what changed in a newer launcher. If this file is gone or doesn't compile, the
   // stock keys show instead.
-  meta { description: "The extra keys over the keyboard while typing in a terminal: esc, tab, ctrl, alt, the arrows, copy and paste"; version: "1.0"; license: "MIT"; category: "system"; owl: 12 }
+  meta { description: "The key bar over the keyboard while typing in a terminal: esc, tab, ctrl, alt, the arrows, copy and paste"; version: "1.0"; license: "MIT"; category: "system"; owl: 12 }
   // The launcher's chevron; currentColor takes the tint.
   asset chevron = base64"PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0iY3VycmVudENvbG9yIiBkPSJNNy40MSwxNS40MUwxMiwxMC44M2w0LjU5LDQuNThMMTgsMTRsLTYsLTYgLTYsNnoiLz48L3N2Zz4="
   // Whether ctrl, alt and shift are latched: "off", "once" (for the next key) or "locked".
@@ -78,7 +78,7 @@ keybar "extra keys" {
     }
   }
 
-  // Framed like the tiles above it, by the extra keys' gaps and border width in settings › style: gapsOut to the
+  // Framed like the tiles above it, by the terminal key bar's gaps and border width in settings › style: gapsOut to the
   // screen's sides and the keyboard. 6 between the keys and to the frame, half of it around each key.
   Column {
     padding: [gapsOut, 0, gapsOut, gapsOut]

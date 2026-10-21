@@ -170,8 +170,8 @@ class Style(
         val SCREEN_GAPS_OUT = Setting.Number("screens.gaps-out", 6.0, 0.0..48.0, "Space in dp from full-screen panels (settings, style, the stores) to the screen's edges.")
         val SCREEN_BORDER_WIDTH = Setting.Number("screens.border-width", 2.0, 0.0..8.0, "How thick full-screen panels' outlines are, in dp.")
 
-        val KEYBAR_GAPS_OUT = Setting.Number("keybar.gaps-out", 6.0, 0.0..48.0, "Space in dp from the extra keys' frame to the screen's sides and the keyboard.")
-        val KEYBAR_BORDER_WIDTH = Setting.Number("keybar.border-width", 2.0, 0.0..8.0, "How thick the extra keys' frame is, in dp. 0 draws none.")
+        val KEYBAR_GAPS_OUT = Setting.Number("keybar.gaps-out", 6.0, 0.0..48.0, "Space in dp from the terminal key bar's frame to the screen's sides and the keyboard.")
+        val KEYBAR_BORDER_WIDTH = Setting.Number("keybar.border-width", 2.0, 0.0..8.0, "How thick the terminal key bar's frame is, in dp. 0 draws none.")
 
         val MONOCHROME_ICONS = Setting.Flag("icons.monochrome", false, "App icons as silhouettes in the accent color, as on Omarchy, rather than in their own colors.")
 

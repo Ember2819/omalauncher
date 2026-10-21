@@ -31,7 +31,7 @@ private fun OwlKind.what() =
                 "as docs/panels.md says). Ask me which swipe it's for, and once it works, pick it for that swipe by setting " +
                 "gestures.swipe-up or gestures.swipe-down to its file name in ~/${StyleStore.GUEST_DIR}/style.toml"
         OwlKind.Keybar ->
-            "extra keys (keybar \"name\" { }: the bar over the soft keyboard while I type in a terminal, as docs/keybar.md " +
+            "a terminal key bar (keybar \"name\" { }: the bar over the soft keyboard while I type in a terminal, as docs/keybar.md " +
                 "says). The launcher shows ${WidgetEngine.KEYBAR}, so change that file rather than making a new one"
     }
 
@@ -60,7 +60,7 @@ fun editWidgetCommand(
             OwlKind.Face -> "face"
             OwlKind.App -> "app"
             OwlKind.Panel -> "panel"
-            OwlKind.Keybar -> "extra keys"
+            OwlKind.Keybar -> "terminal key bar"
         }
     val prompt =
         if (problem != null) {
@@ -88,7 +88,7 @@ fun publishWidgetCommand(
                 "app" to "the app as apps/<my GitHub username in lowercase>/<a short name>/app.owl (not a name a widget there has), " +
                     "with the screen picture owl-check points to next to it as preview.png. It needs an icon: (see docs/apps.md)"
             OwlKind.Panel -> "panel" to "the panel as panels/<my GitHub username in lowercase>/<a short name>/panel.owl, with the screen picture owl-check points to next to it as preview.png"
-            OwlKind.Keybar -> "extra keys" to "the keys as keybars/<my GitHub username in lowercase>/<a short name>/keybar.owl, with the screen picture owl-check points to next to it as preview.png"
+            OwlKind.Keybar -> "terminal key bar" to "the keys as keybars/<my GitHub username in lowercase>/<a short name>/keybar.owl, with the screen picture owl-check points to next to it as preview.png"
         }
     val prompt =
         "Publish my $what $file to the store at https://github.com/${Market.REPO}. " +

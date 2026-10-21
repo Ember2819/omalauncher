@@ -1,8 +1,8 @@
 keybar "layers" {
-  // Extra keys in layers, like a split keyboard's: tabs along the top switch between navigation, F-keys, the symbols a
+  // A key bar in layers, like a split keyboard's: tabs along the top switch between navigation, F-keys, the symbols a
   // phone keyboard hides two taps deep, and tmux, whose keys send its prefix (ctrl+b) and then the key. To use it, copy
   // it over keybar.owl in the folder above.
-  meta { description: "Extra keys in four layers: navigation, F1 to F12, symbols, and tmux commands"; version: "1.0"; license: "MIT"; category: "system"; owl: 12 }
+  meta { description: "A key bar in four layers: navigation, F1 to F12, symbols, and tmux commands"; version: "1.0"; license: "MIT"; category: "system"; owl: 12 }
   source kb = android.modifiers
   state layer = "nav" persist
   state down = ""

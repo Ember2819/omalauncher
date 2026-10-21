@@ -1,8 +1,8 @@
-# Extra keys
+# Terminal key bar
 
 Part of the widget docs: README.md, one folder up, comes first, and paths here are from the widgets folder.
 
-While you type in a terminal, on home or in a Linux app's window, a bar of extra keys sits over the soft keyboard: esc,
+While you type in a terminal, on home or in a Linux app's window, a key bar sits over the soft keyboard: esc,
 tab, ctrl, alt, the arrows and the rest a phone keyboard lacks. It's the file `keybar.owl`, a `keybar "…" { }` file, and
 it's yours to change: different keys, more rows, a key that types a command. `.stock-keybar.owl` is the bar as this
 launcher ships it, which it keeps that way; it shows while `keybar.owl` is gone or doesn't compile (home's banner says
@@ -47,7 +47,7 @@ as `onTap` does, and `repeats: true` keeps an arrow going while it's held. `pres
 long press until it's tapped again, and `android.modifiers` tells the key how to look meanwhile. Closing the keyboard
 lets every latch go. `owl-check keybar.owl` draws the bar at the bottom of a phone's screen.
 
-The extra keys have their own gaps and border width in settings › style (`keybar.gaps-out` and `keybar.border-width`
+The terminal key bar has its own gaps and border width in settings › style (`keybar.gaps-out` and `keybar.border-width`
 in style.toml), apart from the widgets'. In a keybar file `gapsOut` and `borderWidth` read them, and `gapsIn` is the
 widgets' as anywhere: the stock bar keeps `gapsOut` to the screen's sides and the keyboard and draws its frame
 `borderWidth` thick, so a bar that follows them changes with the setting.

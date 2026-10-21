@@ -4,7 +4,7 @@ Each `*.owl` file in this folder is a widget on the Android home screen,
 written in OWL, a small declarative language in the spirit of QML. Its first
 word says what it is: `widget "name" { }` is a home-screen tile, `face "name" { }` a face, a whole home page
 left of your first one (docs/faces.md), and `app "name" { }` an app in the app drawer that opens full screen
-(docs/apps.md). `panel "name" { }` is a view a swipe on home opens (docs/panels.md), and `keybar "name" { }` the extra keys
+(docs/apps.md). `panel "name" { }` is a view a swipe on home opens (docs/panels.md), and `keybar "name" { }` the terminal key bar
 over the keyboard while typing in a terminal (docs/keybar.md). Everything here and in docs/ is about widgets unless it says otherwise; the others are written
 the same way. Save a file and it appears within a second. Then run `owl-check <file>`:
 
@@ -82,7 +82,7 @@ A file holds declarations, then the nodes it shows:
 ## The docs
 
 The rest is in `docs/`. Read the ones for what you're making before you write: a widget usually needs
-declarations.md, nodes.md, expressions.md and handlers.md; a face, an app, a panel or extra keys their own file too.
+declarations.md, nodes.md, expressions.md and handlers.md; a face, an app, a panel or a key bar their own file too.
 
 | read | for |
 |---|---|
@@ -96,7 +96,7 @@ declarations.md, nodes.md, expressions.md and handlers.md; a face, an app, a pan
 | docs/faces.md | faces: a whole home page |
 | docs/apps.md | apps in the app drawer, and their icons |
 | docs/panels.md | panels a swipe opens, the app drawer among them |
-| docs/keybar.md | the extra keys over the keyboard |
+| docs/keybar.md | the terminal key bar over the keyboard |
 | docs/home.md | home's layout.toml, and reaching a running widget from scripts with `owl-send` |
 | docs/sharing.md | the widget store, and sharing a file as a link or QR code |
 | docs/versions.md | what each owl version added |
@@ -120,7 +120,7 @@ OWL looks like QML and JavaScript but isn't either; these are what code written 
 ## Examples
 
 Read the one closest to what you're making before you start. Files at the top of this folder are in use
-already (on home, or as the drawer and the extra keys); the rest are in `examples/`, off home until you move one up into this folder. Examples without `meta { owl: … }` are written for owl 1,
+already (on home, or as the drawer and the terminal key bar); the rest are in `examples/`, off home until you move one up into this folder. Examples without `meta { owl: … }` are written for owl 1,
 so they don't use what came later, like `if` in handlers or a Row's Texts as wide as their text; the
 docs say what's current.
 
@@ -135,7 +135,7 @@ docs say what's current.
 | drawing | `examples/90-analog-clock` (Canvas), `50-koi` (pixel art, taps), `60-owl` (sprites, a pet that keeps its state), `examples/92-aurora` and `examples/89-lava` (Shader) |
 | faces, a whole page | `examples/00-start` (frost, Grid, spans), `examples/01-minimal`, `examples/02-pixel`, `examples/03-matrix` |
 | panels and the prompt bar | `drawer.owl` (lazy lists, search with rank, Popup), `examples/65-ai-bar` (android.agents, ask, open) |
-| extra keys | `keybar.owl`, `examples/keybar-layers` (latch, layers), `examples/keybar-vim`, `examples/keybar-gamepad`, `examples/keybar-commands` (typeText) |
+| the terminal key bar | `keybar.owl`, `examples/keybar-layers` (latch, layers), `examples/keybar-vim`, `examples/keybar-gamepad`, `examples/keybar-commands` (typeText) |
 | a live terminal | `45-terminal` |
 | an app that sends | `examples/ntfy` (two views with `back`, a source whose URL takes a state, `post` with a JSON body, and what it answers shown at once), `examples/github-inbox` (a token kept as a `secret`, `post` with `method: "PATCH"`) |
 
