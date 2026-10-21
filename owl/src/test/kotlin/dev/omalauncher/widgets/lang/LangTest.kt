@@ -687,6 +687,27 @@ class LangTest {
         assertEquals("1048576", text("len(reduce(range(n), (s, i) => s + s, \"a\"))", "meta { owl: 9 }\nstate n = 20"))
     }
 
+    /** A pattern that backtracks without end gives up after a moment, rather than freezing the thread that builds home. */
+    @Test fun aRunawayRegexGivesUp() {
+        val started = System.nanoTime()
+        try {
+            text("match(pad(\"\", n, \"a\"), \"(.*a){27}b\")", "state n = 32")
+            fail("expected the regex to give up")
+        } catch (e: WidgetError) {
+            assertTrue(e.message, e.message!!.contains("takes too long"))
+        }
+        assertTrue((System.nanoTime() - started) / 1_000_000 < 2000)
+        // Refused at once from then on, and other patterns still work.
+        try {
+            text("match(s, \"(.*a){27}b\")", "state s = \"x\"")
+            fail("expected the slow pattern to be refused")
+        } catch (e: WidgetError) {
+            assertTrue(e.message!!.contains("takes too long"))
+        }
+        assertEquals("[12, ab]", text("match(s, \"(\\\\d+)-(\\\\w+)\")", "state s = \"x 12-ab\""))
+        assertEquals("[1, 2, 3]", text("matchAll(s, \"\\\\d\")", "state s = \"1a2b3\""))
+    }
+
     @Test fun errorsPointAtTheProblem() {
         val e = compileError("widget {\n  Text { txt: \"hi\" }\n}")
         assertTrue(e, e.startsWith("2:10: Text has no property 'txt'"))

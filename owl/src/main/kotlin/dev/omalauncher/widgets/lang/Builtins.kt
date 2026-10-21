@@ -14,7 +14,13 @@ import java.time.format.DateTimeFormatterBuilder
 import java.time.temporal.ChronoField
 import java.time.temporal.TemporalQueries
 import java.util.Base64
+import java.util.Collections
 import java.util.Locale
+import java.util.concurrent.Callable
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 import kotlin.math.PI
 import kotlin.math.floor
 import kotlin.math.roundToLong
@@ -184,7 +190,50 @@ object Builtins {
 
     private val WHITESPACE = Regex("\\s+")
 
-    private fun regex(p: String) = synchronized(regexCache) { regexCache.getOrPut(p) { Regex(p) } }
+    /** Patterns built from changing values would fill the cache without end. */
+    private fun regex(p: String) =
+        synchronized(regexCache) {
+            if (regexCache.size >= 256) regexCache.clear()
+            regexCache.getOrPut(p) { Regex(p) }
+        }
+
+    /**
+     * Where match() and matchAll() run. A pattern like `(.*a){20}b` backtracks for minutes on 25 characters, and a
+     * let runs while the screen is built, on the main thread: home froze. Android's regex engine (ICU, native) can't be
+     * interrupted or given a deadline, so a match runs on one of these threads and the caller waits [REGEX_MS] at most;
+     * one that runs over goes on, at the lowest priority, until it ends.
+     */
+    private val regexThreads =
+        Executors.newCachedThreadPool { r ->
+            Thread(r, "owl-regex").apply {
+                isDaemon = true
+                priority = Thread.MIN_PRIORITY
+            }
+        }
+
+    private const val REGEX_MS = 500L
+
+    /** Patterns that ran over [REGEX_MS]: refused from then on, so each leaves at most one thread behind. */
+    private val slowPatterns = Collections.synchronizedSet(HashSet<String>())
+
+    private fun <T> matching(
+        p: String,
+        block: (Regex) -> T,
+    ): T {
+        val slow = "the pattern \"$p\" takes too long: a repeated group with a repeat inside, like (a+)+ or (.*x){5}, or .* " +
+            "several times over long text, tries ever more ways to match; it's off until the launcher restarts"
+        if (p in slowPatterns) throw WidgetError(slow)
+        val r = regex(p)
+        val task = regexThreads.submit(Callable { block(r) })
+        try {
+            return task.get(REGEX_MS, TimeUnit.MILLISECONDS)
+        } catch (e: TimeoutException) {
+            slowPatterns.add(p)
+            throw WidgetError(slow)
+        } catch (e: ExecutionException) {
+            throw e.cause ?: e
+        }
+    }
 
     /** By pattern, and by language tag after a NUL when a widget names one. */
     private val timeFormats = HashMap<String, DateTimeFormatter>()
@@ -649,9 +698,14 @@ object Builtins {
             // match(s, regex): the groups of the first match (or the whole match), null if none.
             "match" to
                 Builtin(2, 2) { a ->
-                    regex(a.str(1)).find(a.str(0))?.let { m -> if (m.groupValues.size > 1) lst(m.groupValues.drop(1).map(::Str)) else Str(m.value) } ?: Null
+                    val text = a.str(0)
+                    matching(a.str(1)) { r -> r.find(text)?.let { m -> if (m.groupValues.size > 1) lst(m.groupValues.drop(1).map(::Str)) else Str(m.value) } } ?: Null
                 },
-            "matchAll" to Builtin(2, 2) { a -> lst(regex(a.str(1)).findAll(a.str(0)).take(MAX_LIST).map { m -> if (m.groupValues.size > 1) Lst(m.groupValues.drop(1).map(::Str)) else Str(m.value) }.toList()) },
+            "matchAll" to
+                Builtin(2, 2) { a ->
+                    val text = a.str(0)
+                    lst(matching(a.str(1)) { r -> r.findAll(text).take(MAX_LIST).map { m -> if (m.groupValues.size > 1) Lst(m.groupValues.drop(1).map(::Str)) else Str(m.value) }.toList() })
+                },
             "parseJson" to Builtin(1, 1) { a -> Json.parseOrText(a.str(0)) },
             // Text as base64 and back; fromBase64 also reads base64url, with or without padding, and gives null for anything else.
             "toBase64" to Builtin(1, 1) { a -> Str(Base64.getEncoder().encodeToString(a.str(0).toByteArray())) },
