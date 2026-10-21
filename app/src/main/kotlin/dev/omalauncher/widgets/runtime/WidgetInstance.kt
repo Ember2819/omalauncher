@@ -576,6 +576,12 @@ class WidgetInstance(
     /** See [WidgetImages.image]. */
     fun image(src: String): WidgetImage? = images.image(src)
 
+    /** An Image node showing [src] came on screen, or left it ([on] false); see [WidgetImages.show]. */
+    fun imageShown(
+        src: String,
+        on: Boolean,
+    ) = if (on) images.show(src) else images.hide(src)
+
     /** See [WidgetFonts.font]. */
     fun font(src: String): androidx.compose.ui.text.font.FontFamily? = fonts.font(src)
 

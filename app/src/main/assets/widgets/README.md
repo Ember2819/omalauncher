@@ -142,8 +142,8 @@ docs say what's current.
 ## Limits
 
 A widget has at most 500 nodes (a page 1000), 2000 drawing calls per frame, lists of 1000
-items, 32 images and 128 SVGs on show at once (a view with more keeps loading them
-again and shows none for long), and a step budget per update. A widget that draws slowly animates at
+items, 32 images and 128 SVGs on show at once (a view with more draws only those, and says so
+in `.errors/`), and a step budget per update. A widget that draws slowly animates at
 half rate. Errors never take the home screen down: the failing value shows `…`
 and the message goes to `.errors/`.
 

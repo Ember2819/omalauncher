@@ -43,6 +43,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
@@ -636,7 +637,13 @@ private fun Element(
             )
         }
         "Image" -> {
-            val src = p.observe("src")?.toString().orEmpty()
+            // A src still loading is no image yet, not one named "null".
+            val src = p.observe("src")?.takeIf { it != Null }?.toString().orEmpty()
+            // Images on show are kept before others when there are more than a widget keeps.
+            DisposableEffect(inst, src) {
+                inst.imageShown(src, true)
+                onDispose { inst.imageShown(src, false) }
+            }
             val image =
                 if (src.startsWith("media:")) {
                     // Album art isn't a file to watch: look again whenever a source (the media one) updates,

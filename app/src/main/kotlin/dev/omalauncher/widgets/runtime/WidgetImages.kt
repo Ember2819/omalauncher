@@ -9,6 +9,7 @@ import dev.omalauncher.widgets.lang.Global
 import dev.omalauncher.widgets.lang.Program
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -35,6 +36,47 @@ internal class WidgetImages(
     /** Srcs asked for so far; main thread only. */
     private val requests = HashSet<String>()
 
+    /** When each src was last asked for, in uptime milliseconds: a Canvas asks for its images on every draw. Main thread only. */
+    private val used = HashMap<String, Long>()
+
+    /** How many Image nodes on show have each src; main thread only. */
+    private val shown = HashMap<String, Int>()
+
+    /** Srcs on show that weren't loaded for want of room: they load once some other image makes way. Main thread only. */
+    private val waiting = LinkedHashSet<String>()
+
+    /** Whether the widget was told it shows more images than are kept. */
+    private var reportedFull = false
+
+    /** An Image node showing [src] came on screen. */
+    fun show(src: String) {
+        shown[src] = (shown[src] ?: 0) + 1
+    }
+
+    /** An Image node showing [src] left the screen: an image waiting for room may take its place. */
+    fun hide(src: String) {
+        val n = (shown[src] ?: 1) - 1
+        if (n > 0) {
+            shown[src] = n
+            return
+        }
+        shown.remove(src)
+        waiting.remove(src)
+        if (waiting.isEmpty()) return
+        scope?.launch {
+            delay(UNUSED_MS)
+            for (w in waiting.toList()) {
+                if (w !in shown || w in requests) {
+                    waiting.remove(w)
+                } else if (makeRoom(w)) {
+                    waiting.remove(w)
+                    requests.add(w)
+                    load(w)
+                }
+            }
+        }
+    }
+
     /**
      * The image for [src], or null until it's decoded, which happens off the
      * main thread and at most at widget size. A guest file is checked again
@@ -44,6 +86,7 @@ internal class WidgetImages(
      * is tried again then too. Safe to call while drawing: it only reads state.
      */
     fun image(src: String): WidgetImage? {
+        if (src.isEmpty()) return null
         // The launcher already holds every app's icon, as snapshot state: reading it redraws once it loads.
         if (src.startsWith("app:")) return services.appIcon(src.removePrefix("app:"))?.let { WidgetImage.Raster(it) }
         if (src.startsWith("icon:")) return services.launcherIcon(src.removePrefix("icon:"))?.let { WidgetImage.Raster(it) }
@@ -54,20 +97,46 @@ internal class WidgetImages(
             mediaArt?.takeIf { it.first === art }?.let { return it.second }
             return WidgetImage.Raster(art.asImageBitmap()).also { mediaArt = art to it }
         }
+        used[src] = android.os.SystemClock.uptimeMillis()
         if (src !in requests) {
             // Not from inside a draw: that would write state while drawing.
             scope?.launch {
                 if (src in requests) return@launch
-                // A src that changes (a cover per track) mustn't keep every image it ever showed: at most
-                // MAX_IMAGES bitmaps and MAX_VECTORS SVGs, which are small whatever size they're drawn at.
-                val vector = isVector(src)
-                val vectors = requests.count(::isVector)
-                if (if (vector) vectors >= MAX_VECTORS else requests.size - vectors >= MAX_IMAGES) forget { isVector(it) == vector }
+                if (!makeRoom(src)) {
+                    if (src in shown) waiting.add(src)
+                    return@launch
+                }
                 requests.add(src)
                 load(src)
             }
         }
         return images[src]
+    }
+
+    /**
+     * Whether [src] may be kept: at most MAX_IMAGES bitmaps and MAX_VECTORS SVGs, which are small whatever size they're
+     * drawn at. A src that changes (a cover per track) mustn't keep every image it ever showed, so one that no Image node
+     * shows and no Canvas drew for [UNUSED_MS] makes way, the longest unused first. While all are on show, [src] waits:
+     * dropping them all, as this did, had 40 images on show load again and again, a core busy for good and none of them
+     * showing for long.
+     */
+    private fun makeRoom(src: String): Boolean {
+        val vector = isVector(src)
+        val kept = requests.filter { isVector(it) == vector }
+        if (kept.size < if (vector) MAX_VECTORS else MAX_IMAGES) return true
+        val now = android.os.SystemClock.uptimeMillis()
+        // Srcs asked for once and gone again (a value that changes every second) mustn't pile up here.
+        if (used.size > 4 * MAX_VECTORS) used.keys.retainAll(requests + shown.keys)
+        val unused = kept.filter { it !in shown && now - (used[it] ?: 0L) >= UNUSED_MS }.minByOrNull { used[it] ?: 0L }
+        if (unused != null) {
+            forget { it == unused }
+            return true
+        }
+        if (!reportedFull) {
+            reportedFull = true
+            report("more than ${if (vector) MAX_VECTORS else MAX_IMAGES} ${if (vector) "SVGs" else "images"} on show at once: the rest aren't drawn")
+        }
+        return false
     }
 
     /** Whether [src] is an SVG: decoded as one, or, until it's loaded, named like one. */
@@ -79,6 +148,7 @@ internal class WidgetImages(
         for (src in gone) {
             images.remove(src)
             stamps.remove(src)
+            used.remove(src)
         }
     }
 
@@ -169,6 +239,9 @@ internal class WidgetImages(
 
         /** Distinct bitmaps kept per widget. */
         private const val MAX_IMAGES = 32
+
+        /** How long an image goes undrawn before a new one may take its place. */
+        private const val UNUSED_MS = 2_000L
 
         /** Distinct SVGs kept per widget; each is drawing commands, a few KB. */
         private const val MAX_VECTORS = 128
