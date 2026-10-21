@@ -195,23 +195,29 @@ fun StyleScreen(
 }
 
 /**
- * The terminal key bar over the keyboard: keybar.owl, as stock, edited or broken, with a dropdown to start the agent on
- * it or put the stock keys back. Here because nothing else says the bar is a file of the user's; gone (removed), it's
- * left out, and the stock keys show.
+ * The terminal key bar over the keyboard: keybar.owl, as stock, edited, broken or removed, with a dropdown to start the
+ * agent on it or put the stock keys back. Here because nothing else says the bar is a file of the user's; removed, the
+ * stock keys show, and back to stock is the way to have the file again.
  */
 @Composable
 private fun KeybarOption(
     runtime: Runtime,
     onAgent: (title: String, command: (bin: String) -> String) -> Unit,
 ) {
-    val spec = runtime.widgets.specs.firstOrNull { it.file.name == WidgetEngine.KEYBAR } ?: return
-    val stockFile = File(spec.file.parentFile, WidgetEngine.STOCK_KEYBAR)
+    val spec = runtime.widgets.specs.firstOrNull { it.file.name == WidgetEngine.KEYBAR }
+    val file = File(runtime.widgets.dir, WidgetEngine.KEYBAR)
+    val stockFile = File(runtime.widgets.dir, WidgetEngine.STOCK_KEYBAR)
     // Whether it's still the bar as shipped; read again when the file reloads, which makes a new spec.
-    val stock = remember(spec) { runCatching { spec.file.readBytes().contentEquals(stockFile.readBytes()) }.getOrDefault(false) }
+    val stock = remember(spec) { spec != null && runCatching { spec.file.readBytes().contentEquals(stockFile.readBytes()) }.getOrDefault(false) }
     val scope = rememberCoroutineScope()
     var open by remember { mutableStateOf(false) }
     var restoring by remember { mutableStateOf(false) }
-    val actions = listOfNotNull(KeybarAction.Edit, KeybarAction.Stock.takeIf { !stock })
+    val actions = listOfNotNull(KeybarAction.Edit.takeIf { spec != null }, KeybarAction.Stock.takeIf { !stock })
+
+    fun restore() {
+        // The widgets folder is watched: the new file reloads the bar.
+        scope.launch(Dispatchers.IO) { runCatching { stockFile.copyTo(file, overwrite = true) } }
+    }
     Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         OptionLabel("keys")
         Box(Modifier.weight(1f, fill = false)) {
@@ -224,25 +230,27 @@ private fun KeybarOption(
             ) {
                 BasicText(
                     when {
+                        spec == null -> "removed"
                         spec.program == null -> "has errors"
                         stock -> "stock"
                         else -> "edited"
                     },
-                    style = Mono.copy(color = if (spec.program == null) Palette.red else Palette.foreground),
+                    style = Mono.copy(color = if (spec != null && spec.program == null) Palette.red else Palette.foreground),
                 )
                 Symbol(if (open) Glyph.ChevronUp else Glyph.ChevronDown, Palette.muted, Modifier.padding(start = 6.dp))
             }
             if (open) {
                 ChoicePopup(actions, null, BelowAnchorStart, onDismiss = { open = false }, onPick = { action ->
                     when (action) {
-                        KeybarAction.Edit -> onAgent("Edit ${spec.name}") { editWidgetCommand(it, spec) }
-                        KeybarAction.Stock -> restoring = true
+                        KeybarAction.Edit -> spec?.let { onAgent("Edit ${it.name}") { bin -> editWidgetCommand(bin, it) } }
+                        // Nothing of the user's to replace.
+                        KeybarAction.Stock -> if (spec == null) restore() else restoring = true
                     }
                 }, label = { it.label })
             }
         }
     }
-    OptionHint(spec.file.name)
+    OptionHint(if (spec == null) "${file.name} is gone, so the stock keys show" else file.name)
     if (restoring) {
         ConfirmDialog(
             "back to the stock keys?",
@@ -251,8 +259,7 @@ private fun KeybarOption(
             onDismiss = { restoring = false },
         ) {
             restoring = false
-            // The widgets folder is watched: the new file reloads the bar.
-            scope.launch(Dispatchers.IO) { runCatching { stockFile.copyTo(spec.file, overwrite = true) } }
+            restore()
         }
     }
 }
