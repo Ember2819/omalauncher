@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs in the guest, for scripts/store-previews.sh: demo data for the store widgets that
 # otherwise only say how to set them up. `gh` answers like a signed-in account, Home
-# Assistant's states are files that curl reads, `curl` answers Cursor's dashboard (cursor-plan, grok-bot), and
+# Assistant's states are files that curl reads, `curl` answers Cursor's dashboard (cursor-plan, grok-bot) and xai's Grok account, and
 # the Tesla tile reads its own fixture, go-limit reads an OpenCode database, `python3` answers
 # google-calendar's feed script and lastfm's helper, and two sleeping `claude` processes stand in for claude-top's
 # and alorse/claude's Claude Code instances. `python` answers
@@ -21,6 +21,7 @@ set -u
 demo=/tmp/store-previews-demo
 ha=~/.config/omarchy-proot/home-assistant
 cursor=~/.config/cursor/auth.json
+grok=~/.grok/auth.json
 tesla=~/.config/omarchy-tesla/fixture.json
 opencode=~/.local/share/opencode/opencode.db
 history=~/.claude/history.jsonl
@@ -79,7 +80,7 @@ if [ "${1:-}" = off ]; then
     /usr/local/bin/getent /usr/local/bin/fastfetch /usr/local/bin/yt-dlp /usr/local/bin/ffmpeg \
     /usr/local/bin/ffprobe /usr/local/bin/adb /usr/local/bin/perl /usr/local/bin/websocat \
     /usr/local/bin/ping
-  for f in "$ha" "$cursor" "$tesla" "$opencode" "$history" "$photoprism" "$owlmaker" "$owlstatus" "$flipper" \
+  for f in "$ha" "$cursor" "$grok" "$tesla" "$opencode" "$history" "$photoprism" "$owlmaker" "$owlstatus" "$flipper" \
     "$agy" "$agenda" "$voice" "$voicestate" "$dictated" "$codex" "$codexcache" "$apkver" "$apkbin" \
     "$apkcache/setup.json" "$apkcache/apps.json" "$apkcache/job.json" "$apkcache/log.txt" "$simkl" \
     "$pptver" "$pptsetup" "$pptstatus" "$devlogsver" "$devlogsbin" "$devlogserrors" "$flashcards" \
@@ -126,16 +127,35 @@ cat > /usr/local/bin/curl <<'EOF'
 #!/bin/sh
 case "$*" in
   *DashboardService/GetCurrentPeriodUsage*) echo '{"billingCycleEnd":"1792627200000","planUsage":{"totalPercentUsed":77,"apiPercentUsed":96,"includedSpend":7000,"limit":7000}}' ;;
-  *DashboardService/GetPlanInfo*) echo '{"planInfo":{"planName":"Pro+","price":"$60/mo"}}' ;;
-  # grok-bot writes the answer to -o and reads the status from -w.
+  # cursor-plan reads the answer from stdout, xai from -o with the status from -w.
+  *DashboardService/GetPlanInfo*)
+    out=; while [ $# -gt 0 ]; do [ "$1" = -o ] && out=$2; shift; done
+    plan='{"planInfo":{"planName":"Pro+","price":"$60/mo"}}'
+    if [ -n "$out" ]; then echo "$plan" > "$out"; printf 200; else echo "$plan"; fi ;;
+  # grok-bot and xai write the answer to -o and read the status from -w.
   *DashboardService/GetSandUsageStatus*)
     while [ $# -gt 0 ]; do [ "$1" = -o ] && out=$2; shift; done
     echo '{"grokPlanLabel":"Grok Bot","cursorPlanName":"Pro+","usagePercent":42,"nextResetTimestampUtc":"2026-10-26T00:00:00.000Z"}' > "$out"
     printf 200 ;;
+  # xai's SuperGrok account, its weekly pool and a verified X profile.
+  *cli-chat-proxy.grok.com/v1/user*)
+    while [ $# -gt 0 ]; do [ "$1" = -o ] && out=$2; shift; done
+    echo '{"subscriptionTier":"SuperGrok","cursorMerged":true,"xUserId":"1234567890"}' > "$out"
+    printf 200 ;;
+  *cli-chat-proxy.grok.com/v1/billing*)
+    while [ $# -gt 0 ]; do [ "$1" = -o ] && out=$2; shift; done
+    echo '{"config":{"isUnifiedBillingUser":true,"creditUsagePercent":38,"currentPeriod":{"type":"WEEKLY","end":"2026-10-26T00:00:00Z"},"prepaidBalance":{"val":1250}}}' > "$out"
+    printf 200 ;;
+  *x.com/i/user/*)
+    while [ $# -gt 0 ]; do [ "$1" = -o ] && out=$2; shift; done
+    echo '{\"screen_name\":\"omarchy\",\"tweets\":1842,\"subscribers_count\":0,\"followers\":12400,\"is_blue_verified\":true}' > "$out"
+    printf 'https://x.com/omarchy 200' ;;
   *) exec /usr/bin/curl "$@" ;;
 esac
 EOF
 chmod +x /usr/local/bin/curl
+aside "$grok"
+echo '[{"key":"demo","user_id":"demo","expires_at":"2099-01-01T00:00:00Z"}]' > "$grok"
 
 # The made-up car from the tesla README: Bluebird, parked at 54% with an 80% charge limit.
 aside "$tesla"
