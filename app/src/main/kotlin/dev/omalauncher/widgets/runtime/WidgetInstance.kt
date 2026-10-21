@@ -464,7 +464,8 @@ class WidgetInstance(
             // `x = post(...)` gets the answer and handles it (a sign-in polled while pending is a 400 each time).
             if (!ok && slot == null) report("post: ${httpFailure(r)}")
             if (slot != null) {
-                write(slot, Obj(mapOf("code" to Num(r.code.toDouble()), "ok" to if (ok) TRUE else FALSE, "out" to if (r.out.isEmpty()) Null else Json.parseOrText(r.out))))
+                // err says why it failed, as a source's status does: offline, refused, a redirect not followed.
+                write(slot, Obj(mapOf("code" to Num(r.code.toDouble()), "ok" to if (ok) TRUE else FALSE, "out" to if (r.out.isEmpty()) Null else Json.parseOrText(r.out), "err" to Str(r.err))))
             }
             // What it changed shows in this widget's sources. A refusal changed nothing: a sign-in polled
             // until it's approved mustn't fetch everything again each time.
