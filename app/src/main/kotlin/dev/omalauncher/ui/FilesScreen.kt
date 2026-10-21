@@ -119,10 +119,13 @@ fun FilesScreen(
 
     fun edit(entry: GuestEntry) = runtime.edit(entry.path)
 
-    /** The Android file for [entry]; null, with a toast, for a link that leads out of Linux or round in a loop. */
+    /**
+     * The Android file for [entry]; null, with a toast, for a link that leads out of Linux, round in a loop or to
+     * nothing, like one into /proc, which Linux sees and Files doesn't.
+     */
     fun hostFile(entry: GuestEntry): File? =
         try {
-            fs.host(entry.path)
+            fs.host(entry.path).also { if (!it.exists()) throw IOException("it leads to nothing") }
         } catch (e: IOException) {
             toast("can't open ${entry.name}: ${e.message}")
             null
