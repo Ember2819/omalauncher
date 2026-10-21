@@ -668,6 +668,25 @@ class LangTest {
         }
     }
 
+    /** Doubling takes few steps but would take gigabytes: an OutOfMemoryError took the launcher down. */
+    @Test fun textStopsGrowingPastItsCap() {
+        for (expr in listOf(
+            "len(reduce(range(n), (s, i) => s + s, \"a\"))",
+            "len(reduce(range(n), (s, i) => \"\${s}\${s}\", \"a\"))",
+            "len(toJson(reduce(range(n), (s, i) => [s, s], [1])))",
+            "len(str(reduce(range(n), (s, i) => [s, s], [1])))",
+            "len(join(reduce(range(n), (s, i) => [s + s], [\"a\"]), \",\"))",
+        )) {
+            try {
+                text(expr, "meta { owl: 9 }\nstate n = 30")
+                fail("expected $expr to stop at the cap")
+            } catch (e: WidgetError) {
+                assertTrue(e.message, e.message!!.contains("over 4M characters"))
+            }
+        }
+        assertEquals("1048576", text("len(reduce(range(n), (s, i) => s + s, \"a\"))", "meta { owl: 9 }\nstate n = 20"))
+    }
+
     @Test fun errorsPointAtTheProblem() {
         val e = compileError("widget {\n  Text { txt: \"hi\" }\n}")
         assertTrue(e, e.startsWith("2:10: Text has no property 'txt'"))

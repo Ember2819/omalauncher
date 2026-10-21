@@ -550,8 +550,26 @@ object Builtins {
             "lines" to Builtin(1, 1) { a -> lst(a.str(0).lines().filter { it.isNotBlank() }.map(::Str)) },
             "words" to Builtin(1, 1) { a -> lst(a.str(0).trim().split(WHITESPACE).filter { it.isNotEmpty() }.map(::Str)) },
             "split" to Builtin(2, 2) { a -> lst(a.str(0).split(a.str(1)).map(::Str)) },
-            "join" to Builtin(1, 2) { a -> Str(a.list(0).joinToString(if (a.size > 1) a.str(1) else "") { if (it is Str) it.v else it.toString() }) },
-            "replace" to Builtin(3, 3) { a -> Str(a.str(0).replace(a.str(1), a.str(2))) },
+            "join" to
+                Builtin(1, 2) { a ->
+                    val sep = if (a.size > 1) a.str(1) else ""
+                    val out = StringBuilder()
+                    a.list(0).forEachIndexed { i, x ->
+                        if (i > 0) out.append(sep)
+                        out.append(if (x is Str) x.v else x.toString())
+                        checkText(out.length)
+                    }
+                    Str(out.toString())
+                },
+            "replace" to
+                Builtin(3, 3) { a ->
+                    val s = a.str(0)
+                    val from = a.str(1)
+                    val to = a.str(2)
+                    // "a" for every character of a long text multiplies it.
+                    if (to.length > from.length && from.isNotEmpty()) checkText(s.length / from.length * to.length + s.length)
+                    Str(s.replace(from, to))
+                },
             // owl 6: a value as one shell word, for commands put together while the widget runs.
             "sh" to Builtin(1, 1) { a -> Str(shQuote(a[0].let { if (it == Null) "" else it.text() })) },
             // owl 8: a value as one URL component, for http(...) URLs put together while the widget runs.
@@ -798,7 +816,7 @@ object Builtins {
                     Obj(out.mapValues { Lst(it.value) })
                 },
             // owl 9: JSON text, for a post body built by hand, a file or a command.
-            "toJson" to Builtin(1, 1) { a -> Str(Json.write(a[0]) ?: throw WidgetError("toJson takes numbers, text, lists and maps, not colors or functions")) },
+            "toJson" to Builtin(1, 1) { a -> Str(Json.write(a[0], MAX_TEXT) ?: throw WidgetError("toJson takes numbers, text, lists and maps, not colors or functions")) },
             // colors
             "rgb" to Builtin(3, 4) { a -> rgb(a.num(0), a.num(1), a.num(2), a.num(3, 1.0)) },
             "hsl" to Builtin(3, 4) { a -> hsl(a.num(0), a.num(1), a.num(2), a.num(3, 1.0)) },
@@ -863,7 +881,12 @@ object Builtins {
                     a is Num && b is Num -> Num(a.v + b.v)
                     a is Lst && b is Lst -> lst(a.items + b.items)
                     // Strings join as written ("- " + x keeps its space); only other values are formatted.
-                    a is Str || b is Str -> Str((if (a is Str) a.v else a.text()) + (if (b is Str) b.v else b.text()))
+                    a is Str || b is Str -> {
+                        val x = if (a is Str) a.v else a.text()
+                        val y = if (b is Str) b.v else b.text()
+                        checkText(x.length + y.length)
+                        Str(x + y)
+                    }
                     else -> {
                         val x = a.num()
                         val y = b.num()

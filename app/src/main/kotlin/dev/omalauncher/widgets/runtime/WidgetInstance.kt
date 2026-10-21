@@ -34,6 +34,7 @@ import dev.omalauncher.widgets.lang.Host
 import dev.omalauncher.widgets.lang.KeyNames
 import dev.omalauncher.widgets.lang.Json
 import dev.omalauncher.widgets.lang.Lst
+import dev.omalauncher.widgets.lang.MAX_TEXT
 import dev.omalauncher.widgets.lang.Null
 import dev.omalauncher.widgets.lang.Num
 import dev.omalauncher.widgets.lang.Obj
@@ -453,7 +454,7 @@ class WidgetInstance(
         method: String,
     ) {
         // A map or list goes as JSON, anything else as its text.
-        val json = if (body is Obj || body is Lst) Json.write(body) else null
+        val json = if (body is Obj || body is Lst) Json.write(body, MAX_TEXT) else null
         val bytes = (json ?: if (body == Null) "" else body.toString()).toByteArray()
         val sent = if (json != null && headers.keys.none { it.equals("Content-Type", true) }) headers + ("Content-Type" to "application/json") else headers
         val scope = scope ?: return
@@ -549,6 +550,10 @@ class WidgetInstance(
             Null
         } catch (e: StackOverflowError) {
             report("$where: too deeply nested")
+            Null
+        } catch (e: OutOfMemoryError) {
+            // What failed is the widget's one huge value, gone again once this unwinds.
+            report("$where: out of memory")
             Null
         }
     }

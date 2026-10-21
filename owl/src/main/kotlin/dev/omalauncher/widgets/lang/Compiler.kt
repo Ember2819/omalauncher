@@ -1345,7 +1345,10 @@ class Compiler private constructor(
                 val literal = BooleanArray(e.parts.size) { e.parts[it].let { p -> p is Expr.Lit && p.value is Str } }
                 fold(parts) { env ->
                     val sb = StringBuilder()
-                    for (i in parts.indices) parts[i](env).let { v -> sb.append(if (literal[i]) v.toString() else v.text()) }
+                    for (i in parts.indices) {
+                        parts[i](env).let { v -> sb.append(if (literal[i]) v.toString() else v.text()) }
+                        checkText(sb.length)
+                    }
                     Str(sb.toString())
                 }
             }

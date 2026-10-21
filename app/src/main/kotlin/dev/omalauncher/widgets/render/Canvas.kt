@@ -96,6 +96,10 @@ internal fun CanvasNode(
             inst.report("Canvas: ${e.message}")
         } catch (e: RuntimeException) {
             inst.report("Canvas: $e")
+        } catch (e: StackOverflowError) {
+            inst.report("Canvas: too deeply nested")
+        } catch (e: OutOfMemoryError) {
+            inst.report("Canvas: out of memory")
         }
         inst.recordDraw(System.nanoTime() - started)
     }
