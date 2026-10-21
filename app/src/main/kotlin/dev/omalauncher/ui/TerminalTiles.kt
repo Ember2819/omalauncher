@@ -140,9 +140,12 @@ class TerminalTiles(
         if (field === f) field = null
     }
 
-    /** A press at window point [p]: outside the typing tile, it gives the home screen its touches back. */
+    /**
+     * A press at window point [p]: outside the typing tile, it gives the home screen its touches back. The whole tile,
+     * not only its terminal: a widget's own keys beside its Terminal press keys in it rather than taking the keyboard away.
+     */
     fun pressAt(p: Offset) {
-        val bounds = active?.bounds ?: tile.takeIf { field != null } ?: return
+        val bounds = typingBounds(field != null, tile, active?.bounds) ?: return
         if (extraKeys?.contains(p) == true) return
         if (!bounds.translate(0f, -lift).contains(p)) deactivate()
     }
