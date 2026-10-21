@@ -124,6 +124,23 @@ class Compiler private constructor(
         }
     }
 
+    /**
+     * Whether text put together now waits for each value in it: a URL, a command or an image's src with a value still
+     * loading is null, and waits, rather than asked for with "…" in it (`?days=${int(days)}` sent `days=…`).
+     */
+    private var wholeOnly = false
+
+    /** Compiles [f], what a request asks for, with [wholeOnly] set. */
+    private fun <T> whole(f: () -> T): T {
+        val was = wholeOnly
+        wholeOnly = true
+        try {
+            return f()
+        } finally {
+            wholeOnly = was
+        }
+    }
+
     /** Compiles [f] with secrets readable, but not sent: `token == null` only says whether it's set. */
     private fun <T> checking(f: () -> T): T {
         val was = sent
@@ -195,7 +212,7 @@ class Compiler private constructor(
         scope: Scope,
     ): Ev =
         inRequestUrl {
-            val url = ex(e, scope)
+            val url = whole { ex(e, scope) }
             (url.const as? Str)?.v?.let { if (!it.startsWith("https://") && !it.startsWith("http://")) fail("$name takes an http:// or https:// URL", e.pos) }
             // Like a command's sh(...) values: listed by shape when the host is fixed and each value is enc(...) or a number.
             listUrl(what, e, url, scope)
@@ -749,7 +766,7 @@ class Compiler private constructor(
             }
             e is Expr.Call && e.name in setOf("cmd", "stream") -> {
                 if (e.args.size != 1 || e.named.isNotEmpty()) fail("${e.name}(\"command\") takes one command", e.pos)
-                val arg = ex(e.args[0], root)
+                val arg = whole { ex(e.args[0], root) }
                 listCommand(e.args[0], arg, root, "${e.name}(…)", listed)
                 if (!d.optional) guest = true
                 Global.Source(d.name, e.name, arg, (every ?: 60.0).coerceAtLeast(1.0), d.json, timeout.coerceIn(1, 300), d.status, optional = d.optional)
@@ -757,7 +774,7 @@ class Compiler private constructor(
             e is Expr.Call && e.name == "file" -> {
                 if (e.args.size != 1 || e.named.isNotEmpty()) fail("file(\"~/path\") takes one path", e.pos)
                 if (d.every != null || d.timeout != null) fail("file(...) updates when the file changes; it takes no every or timeout", d.pos)
-                val path = ex(e.args[0], root)
+                val path = whole { ex(e.args[0], root) }
                 (path.const as? Str)?.v?.let { if (!it.startsWith("/") && !it.startsWith("~/")) fail("file takes a path starting with / or ~/", e.args[0].pos) }
                 commands += listed + "read file " + ((path.const as? Str)?.v ?: "(a path built from widget values)")
                 since("file", e.pos)
@@ -951,7 +968,7 @@ class Compiler private constructor(
                 if (body.handlers.none { it.name == "onPress" }) fail("repeats runs onPress again while the finger stays down: add onPress", p.pos)
             }
             if (p.name == "font") font(p.value, scope)
-            props[p.name] = prop(p, scope)
+            props[p.name] = if (n.type == "Image" && p.name == "src") whole { prop(p, scope) } else prop(p, scope)
         }
         val handlers =
             body.handlers.associate { h ->
@@ -1343,10 +1360,13 @@ class Compiler private constructor(
                 val parts = e.parts.map { ex(it, s) }
                 // Values are trimmed (command output ends in newlines); the literal text around them isn't.
                 val literal = BooleanArray(e.parts.size) { e.parts[it].let { p -> p is Expr.Lit && p.value is Str } }
+                val whole = wholeOnly
                 fold(parts) { env ->
                     val sb = StringBuilder()
                     for (i in parts.indices) {
-                        parts[i](env).let { v -> sb.append(if (literal[i]) v.toString() else v.text()) }
+                        val v = parts[i](env)
+                        if (whole && v == Null) return@fold Null
+                        sb.append(if (literal[i]) v.toString() else v.text())
                         checkText(sb.length)
                     }
                     Str(sb.toString())

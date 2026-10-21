@@ -708,6 +708,29 @@ class LangTest {
         assertEquals("[1, 2, 3]", text("matchAll(s, \"\\\\d\")", "state s = \"1a2b3\""))
     }
 
+    /** A URL, command or image src with a value still loading waits for it, rather than asking with "…" in it. */
+    @Test fun aRequestWaitsForEveryPartOfIt() {
+        val p =
+            Compiler.compile(
+                "widget \"t\" {\nmeta { owl: 8 }\nstate n = null\nstate q = null\n" +
+                    "source a = http(\"https://a.example/x?d=\${int(n)}\")\nsource b = cmd(\"echo \${int(n)}\")\n" +
+                    "source c = http(\"https://a.example/x?q=\${enc(q)}\")\n" +
+                    "Column { Image { src: \"https://a.example/\${int(n)}.png\" }\nText { text: \"d=\${int(n)}\" } }\n}",
+            )
+        val host = TestHost(p)
+        fun source(name: String) = (p.globals.first { it.name == name } as Global.Source).arg!!(Env.root(host))
+        assertEquals(Null, source("a"))
+        assertEquals(Null, source("b"))
+        // enc() and sh() of null are empty on purpose: a search with nothing typed yet.
+        assertEquals("https://a.example/x?q=", source("c").toString())
+        val column = p.root.single() as WNode.Element
+        val (image, text) = column.children.map { it as WNode.Element }
+        assertEquals(Null, image.props["src"]!!(Env.root(host)))
+        assertEquals("d=…", text.props["text"]!!(Env.root(host)).toString())
+        host.slots[p.globals.indexOfFirst { it.name == "n" }] = Num(7.0)
+        assertEquals("https://a.example/x?d=7", source("a").toString())
+    }
+
     @Test fun errorsPointAtTheProblem() {
         val e = compileError("widget {\n  Text { txt: \"hi\" }\n}")
         assertTrue(e, e.startsWith("2:10: Text has no property 'txt'"))

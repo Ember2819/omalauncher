@@ -284,6 +284,8 @@ private class Painter(
             }
             "image" -> {
                 val color = named["color"]?.let { Builtins.argb(it, inst) }
+                // A src still loading draws nothing yet, rather than asking for an image named "null".
+                if (first == Null) return
                 when (val image = inst.image(first.toString()) ?: return) {
                     is WidgetImage.Raster -> {
                         val bitmap = image.bitmap

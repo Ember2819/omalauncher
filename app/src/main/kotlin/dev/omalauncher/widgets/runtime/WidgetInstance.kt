@@ -683,9 +683,16 @@ class WidgetInstance(
                         }
                         when (g.kind) {
                             "stream" -> {
-                                val command = eval(g.arg!!, root, g.name).toString()
-                                // Off screen: stop listening (the process stops once nobody listens).
-                                val ended = untilPaused(active, g) { services.stream(command) { line -> set(slot, g, line) } }
+                                val command = eval(g.arg!!, root, g.name)
+                                if (command == Null) {
+                                    // Built from a value still loading: it waits for it, rather than running "null".
+                                    untilPaused(active, g) { snapshotFlow { eval(g.arg!!, root, g.name) }.first { it != Null } }
+                                    continue
+                                }
+                                // Off screen: stop listening (the process stops once nobody listens). A command built from
+                                // state starts anew when it changes, as a cmd's runs again: it kept printing for the old value.
+                                val current = if (g.arg!!.const == null) ({ active() && eval(g.arg!!, root, g.name) == command }) else active
+                                val ended = untilPaused(current, g) { services.stream(command.toString()) { line -> set(slot, g, line) } }
                                 if (ended) delay(5000) // the command exited: restart it, but not in a tight loop
                             }
                             "file" ->
