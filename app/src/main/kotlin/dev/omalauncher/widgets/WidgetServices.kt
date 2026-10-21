@@ -24,6 +24,8 @@ import android.os.StatFs
 import android.view.Display
 import android.view.HapticFeedbackConstants
 import android.view.View
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.graphics.ImageBitmap
 import dev.omalauncher.BuildConfig
@@ -248,18 +250,21 @@ class WidgetServices(
         return if (runtime.androidApps.cloned(serial)) "clone" else "work"
     }
 
+    /** Apps by package, in the drawer's order: a widget listing every app asks for each one's icon, and a scan per icon was O(n²). */
+    private val appsByPackage by derivedStateOf { runtime.androidApps.apps.groupBy { it.component.packageName } }
+
     /**
      * An app's icon as the drawer shows it (its silhouette with monochrome icons), badge included. By package, the launcher's
      * own profile first; `pkg@work` and `pkg@clone` ask for the copy in a work profile or a clone profile, and nothing else.
      */
     override fun appIcon(pkg: String): ImageBitmap? {
         val apps = runtime.androidApps
-        val name = pkg.substringBefore('@')
+        val copies = appsByPackage[pkg.substringBefore('@')] ?: return null
         val app =
             when (pkg.substringAfter('@', "")) {
-                "work" -> apps.apps.firstOrNull { it.component.packageName == name && it.work }
-                "clone" -> apps.apps.firstOrNull { it.component.packageName == name && it.clone }
-                "" -> apps.apps.firstOrNull { it.component.packageName == name && it.profile == null } ?: apps.apps.firstOrNull { it.component.packageName == name }
+                "work" -> copies.firstOrNull { it.work }
+                "clone" -> copies.firstOrNull { it.clone }
+                "" -> copies.firstOrNull { it.profile == null } ?: copies.first()
                 else -> null
             } ?: return null
         val key = androidAppKey(app.component, app.profile)
@@ -327,16 +332,18 @@ class WidgetServices(
      * What a fetch shows about the phone, all from Android, so it works without Linux:
      * kernel, uptime, memory, storage, CPU, display, build, locale and the launcher itself.
      */
+    /** Max clock over the cores in kHz, read once: it doesn't change, and system() runs every interval. Some phones don't let apps read it. */
+    private val maxFreq by lazy {
+        (0 until java.lang.Runtime.getRuntime().availableProcessors()).mapNotNull { i ->
+            runCatching { File("/sys/devices/system/cpu/cpu$i/cpufreq/cpuinfo_max_freq").readText().trim().toLong() }.getOrNull()
+        }.maxOrNull()
+    }
+
     private fun system(): Value {
         val memory = ActivityManager.MemoryInfo().also { context.getSystemService(ActivityManager::class.java).getMemoryInfo(it) }
         val data = StatFs(Environment.getDataDirectory().path)
         val display = context.getSystemService(DisplayManager::class.java).getDisplay(Display.DEFAULT_DISPLAY)
         val mode = display?.mode
-        // Max clock per core in kHz; some phones don't let apps read it.
-        val maxFreq =
-            (0 until java.lang.Runtime.getRuntime().availableProcessors()).mapNotNull { i ->
-                runCatching { File("/sys/devices/system/cpu/cpu$i/cpufreq/cpuinfo_max_freq").readText().trim().toLong() }.getOrNull()
-            }.maxOrNull()
         fun num(v: Long) = Num(v.toDouble())
         return Obj(
             mapOf(

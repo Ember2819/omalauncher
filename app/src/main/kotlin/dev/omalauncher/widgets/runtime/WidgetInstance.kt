@@ -961,7 +961,8 @@ class WidgetInstance(
                             } else {
                                 services.cmd(target, g.timeout)
                             }
-                        val out = if (g.json) Json.parseOrText(r.out) else Str(r.out)
+                        // Up to a megabyte of JSON: parsed off the main thread.
+                        val out = if (g.json) withContext(Dispatchers.Default) { Json.parseOrText(r.out) } else Str(r.out)
                         fetched = g.kind != "http" || ok(g, r)
                         if (g.status) {
                             Obj(mapOf("out" to out, "err" to Str(r.err), "code" to Num(r.code.toDouble()), "ok" to bool(ok(g, r))))

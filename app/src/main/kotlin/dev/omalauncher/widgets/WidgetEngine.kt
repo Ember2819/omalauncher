@@ -466,7 +466,12 @@ class WidgetEngine(
     }
 
     /** Widgets, pinned apps and folders on [page]. Wrappers compare by spec, so unchanged pages skip recomposition. */
-    fun itemsOn(page: Int): List<HomeItem> = specs.filter { it.page == page && onHome(it) }.map(::WidgetItem) + shortcuts.onGrid().filter { it.page == page }
+    fun itemsOn(page: Int): List<HomeItem> = itemsByPage[page].orEmpty()
+
+    /** Built once per change rather than per call: home asks for every page on each recomposition, and drags ask often. */
+    private val itemsByPage by derivedStateOf {
+        (specs.filter(::onHome).map(::WidgetItem) + shortcuts.onGrid()).groupBy { it.page }
+    }
 
     private val pageList by derivedStateOf {
         (specs.filter(::onHome).map { it.page } + shortcuts.onGrid().map { it.page }).distinct().sorted().ifEmpty { listOf(1) }

@@ -28,6 +28,7 @@ internal fun numeric(
             if (d.isNaN()) slow(env) else Num(d)
         },
         fast,
+        slow,
     )
 }
 

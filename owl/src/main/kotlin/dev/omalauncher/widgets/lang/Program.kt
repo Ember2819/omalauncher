@@ -150,6 +150,8 @@ class Ev internal constructor(
      * boxing saved in a Canvas that draws a value still loading every frame.
      */
     internal val fast: Fast?,
+    /** What [invoke] falls back to when [fast] gives NaN; [num] goes straight to it rather than through [fast] again. */
+    private val slow: Ev? = null,
 ) {
     constructor(const: Value?, f: (Env) -> Value) : this(const, f, null)
 
@@ -163,6 +165,7 @@ class Ev internal constructor(
         if (fast != null) {
             val d = fast.of(env)
             if (!d.isNaN()) return d
+            if (slow != null) return slow(env).let { if (it is Num) it.v else it.num() ?: default }
         }
         val v = invoke(env)
         return if (v is Num) v.v else v.num() ?: default

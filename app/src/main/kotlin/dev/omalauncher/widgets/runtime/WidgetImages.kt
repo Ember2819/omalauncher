@@ -88,25 +88,37 @@ internal class WidgetImages(
     /** When guest image files were last checked for changes, in elapsed milliseconds. */
     private var checked = 0L
 
+    /** Srcs being loaded now; main thread only. A recheck while one loads skips it rather than decoding it twice. */
+    private val loading = HashSet<String>()
+
     private fun load(src: String) {
         val scope = scope ?: return
         scope.launch {
-            val remote = src.startsWith("https://")
-            // The cache keeps a downloaded image fresh; one that loaded stays for as long as the widget runs.
-            if (remote && images[src] != null) return@launch
-            val decoded =
-                withContext(Dispatchers.IO) {
-                    // Resolved as the guest sees it: a stat per part of the path, so off the main thread too.
-                    val file = if (src.startsWith("asset:") || remote) null else services.guestFile(src)
-                    val stamp = file?.lastModified() ?: 0L
-                    if (!remote && stamps[src] == stamp) return@withContext null
-                    stamps[src] = stamp
-                    Result.success(runCatching { decode(src, file) }.getOrNull())
-                } ?: return@launch
-            val image = decoded.getOrNull()
-            if (image == null) report(if (remote) "image '$src' couldn't be downloaded, or isn't an image" else "image '$src' couldn't be loaded")
-            images[src] = image
+            if (!loading.add(src)) return@launch
+            try {
+                loadNow(src)
+            } finally {
+                loading.remove(src)
+            }
         }
+    }
+
+    private suspend fun loadNow(src: String) {
+        val remote = src.startsWith("https://")
+        // The cache keeps a downloaded image fresh; one that loaded stays for as long as the widget runs.
+        if (remote && images[src] != null) return
+        val decoded =
+            withContext(Dispatchers.IO) {
+                // Resolved as the guest sees it: a stat per part of the path, so off the main thread too.
+                val file = if (src.startsWith("asset:") || remote) null else services.guestFile(src)
+                val stamp = file?.lastModified() ?: 0L
+                if (!remote && stamps[src] == stamp) return@withContext null
+                stamps[src] = stamp
+                Result.success(runCatching { decode(src, file) }.getOrNull())
+            } ?: return
+        val image = decoded.getOrNull()
+        if (image == null) report(if (remote) "image '$src' couldn't be downloaded, or isn't an image" else "image '$src' couldn't be loaded")
+        images[src] = image
     }
 
     /** [src]'s image, from its asset, the web or a guest [file]; off the main thread. */
@@ -140,7 +152,9 @@ internal class WidgetImages(
      */
     fun recheck(kind: String) {
         val now = android.os.SystemClock.elapsedRealtime()
-        if (kind == "cmd" || kind == "stream" || kind == "file" || now - checked >= RECHECK_MS) {
+        // A stream can print many lines a second: its images are checked at most once a second.
+        val due = now - checked >= if (kind == "cmd" || kind == "file") 0 else if (kind == "stream") STREAM_RECHECK_MS else RECHECK_MS
+        if (due) {
             checked = now
             for (src in requests) if (!src.startsWith("asset:")) load(src)
         }
@@ -149,6 +163,9 @@ internal class WidgetImages(
     private companion object {
         /** How often guest image files are checked for changes when no guest command ran. */
         private const val RECHECK_MS = 5_000L
+
+        /** How often guest image files are checked while a stream source prints. */
+        private const val STREAM_RECHECK_MS = 1_000L
 
         /** Distinct bitmaps kept per widget. */
         private const val MAX_IMAGES = 32
