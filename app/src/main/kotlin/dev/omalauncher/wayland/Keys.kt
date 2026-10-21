@@ -7,23 +7,10 @@ import dev.omalauncher.widgets.lang.KeyNames
 object Keys {
     const val KEY_LEFTSHIFT = 42
     const val KEY_BACKSPACE = 14
-    const val KEY_ENTER = 28
-    const val KEY_ESC = 1
-    const val KEY_TAB = 15
     const val KEY_MINUS = 12
     const val KEY_EQUAL = 13
-    const val KEY_SLASH = 53
     const val KEY_LEFTCTRL = 29
     const val KEY_LEFTALT = 56
-    const val KEY_HOME = 102
-    const val KEY_UP = 103
-    const val KEY_PAGEUP = 104
-    const val KEY_LEFT = 105
-    const val KEY_RIGHT = 106
-    const val KEY_END = 107
-    const val KEY_DOWN = 108
-    const val KEY_PAGEDOWN = 109
-    const val KEY_INSERT = 110
 
     private val byKeyCode =
         buildMap {
