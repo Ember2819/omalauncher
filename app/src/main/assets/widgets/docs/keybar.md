@@ -17,7 +17,7 @@ keybar "my keys" {
     Box { weight: 1; height: 40; padding: 3
       Box { fill: true; align: center; radius: 8 * corners; background: surface; repeats: send == "up" || send == "down"
         onPress: { if repeat == 0 { haptic() }; pressKey(send) }
-        Text { text: label; font: mono } } }
+        Text { text: label; font: mono; align: center } } }
   }
   Row {
     gap: 0
@@ -27,12 +27,12 @@ keybar "my keys" {
     Box { weight: 1; height: 40; padding: 3
       Box { fill: true; align: center; radius: 8 * corners; background: get(kb ?? {}, "ctrl", "off") == "off" ? surface : accent
         onTap: latch("ctrl"); onLongPress: latch("ctrl", "locked")
-        Text { text: "ctrl"; font: mono } } }
+        Text { text: "ctrl"; font: mono; align: center } } }
     K { label: "↑"; send: "up" }
     K { label: "↓"; send: "down" }
     Box { weight: 1; height: 40; padding: 3
       Box { fill: true; align: center; radius: 8 * corners; background: surface; onPress: typeText("git status\n")
-        Text { text: "gs"; font: mono } } }
+        Text { text: "gs"; font: mono; align: center } } }
   }
 }
 ```
