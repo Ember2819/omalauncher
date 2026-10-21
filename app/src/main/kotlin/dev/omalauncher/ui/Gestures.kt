@@ -96,7 +96,7 @@ internal fun Runtime.gestureProblems(): List<Pair<String, List<String>>> {
             spec.file.name to listOf("$what until it's fixed: " + spec.error!!.lineSequence().first())
         }
     // keybar.owl too: the stock keys stand in for it as quietly.
-    val keys = widgets.specs.firstOrNull { it.file.name == WidgetEngine.KEYBAR && it.error != null }?.let { it.file.name to listOf("the extra keys are the stock ones until it's fixed: " + it.error!!.lineSequence().first()) }
+    val keys = widgets.specs.firstOrNull { it.file.name == WidgetEngine.KEYBAR && it.error != null }?.let { it.file.name to listOf("the terminal key bar is the stock one until it's fixed: " + it.error!!.lineSequence().first()) }
     return panels + listOfNotNull(keys)
 }
 
@@ -232,8 +232,8 @@ internal fun Modifier.pullSwipe(state: LauncherState): Modifier {
 }
 
 /**
- * Gesture settings: what swiping up and swiping down on home open, each picked from a dropdown of choices and panels;
- * and the extra keys over the keyboard, owl files too, to edit with the agent.
+ * Gesture settings: what swiping up and swiping down on home open, each picked from a dropdown of choices and panels,
+ * owl files to edit with the agent.
  */
 @Composable
 fun GesturesScreen(
@@ -251,11 +251,8 @@ fun GesturesScreen(
         Spacer(Modifier.height(8.dp))
         GestureRow("swipe down", listOf(Gestures.NONE to "nothing") + panels, gestures.swipeDown) { gestures.swipeDown = it }
         EditPanel(runtime, gestures.swipeDown, onAgent)
-        Spacer(Modifier.height(8.dp))
-        ExtraKeysRow(runtime, onAgent)
         BasicText(
             "panels are owl files, the drawer among them: edit them like widgets, or create one with your agent from home's menu. " +
-                "so are the extra keys over the keyboard while you type in a terminal. " +
                 "with nothing on swipe up, tapping the bar still opens the drawer",
             Modifier.padding(top = 12.dp, start = 14.dp, end = 14.dp),
             style = Mono.copy(color = Palette.muted, fontSize = TextSize.Small),
@@ -271,35 +268,6 @@ private fun EditPanel(
     onAgent: (title: String, command: (bin: String) -> String) -> Unit,
 ) {
     EditFile(runtime.widgets.panels().firstOrNull { it.file.name == choice } ?: return, onAgent)
-}
-
-/**
- * The extra keys over the keyboard while typing in a terminal: keybar.owl, with [edit] to start the agent on it. Here
- * because nothing else says the bar is a file of the user's; gone (removed), it's left out, and the stock keys show.
- */
-@Composable
-private fun ExtraKeysRow(
-    runtime: Runtime,
-    onAgent: (title: String, command: (bin: String) -> String) -> Unit,
-) {
-    val spec = runtime.widgets.specs.firstOrNull { it.file.name == WidgetEngine.KEYBAR } ?: return
-    // Whether it's still the bar as shipped; read again when the file reloads, which makes a new spec.
-    val stock =
-        remember(spec) {
-            runCatching { spec.file.readBytes().contentEquals(java.io.File(spec.file.parentFile, WidgetEngine.STOCK_KEYBAR).readBytes()) }.getOrDefault(false)
-        }
-    Row(Modifier.card(), verticalAlignment = Alignment.CenterVertically) {
-        BasicText("extra keys", Modifier.weight(1f), style = Mono.copy(fontSize = TextSize.Item))
-        BasicText(
-            when {
-                spec.program == null -> "has errors"
-                stock -> "stock"
-                else -> "edited"
-            },
-            style = Mono.copy(color = if (spec.program == null) Palette.red else Palette.accent, fontSize = TextSize.Item),
-        )
-    }
-    EditFile(spec, onAgent)
 }
 
 /** [edit] starts the agent on [spec]'s file, as one edits a face or a widget. */

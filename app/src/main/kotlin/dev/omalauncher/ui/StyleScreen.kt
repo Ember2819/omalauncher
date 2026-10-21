@@ -83,6 +83,8 @@ import dev.omalauncher.theme.ThemeDirs
 import dev.omalauncher.theme.ThemeDownload
 import dev.omalauncher.theme.ThemeStore
 import dev.omalauncher.theme.Toml
+import dev.omalauncher.widgets.WidgetEngine
+import dev.omalauncher.widgets.editWidgetCommand
 import java.io.File
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -100,6 +102,8 @@ fun StyleScreen(
     onDismiss: () -> Unit,
     /** Opens the community themes over this screen. */
     onBrowse: () -> Unit,
+    /** Opens the agent on keybar.owl. */
+    onAgent: (title: String, command: (bin: String) -> String) -> Unit,
 ) {
     val store = runtime.themes
     val scope = rememberCoroutineScope()
@@ -138,9 +142,9 @@ fun StyleScreen(
             Heading("screens")
             Stepper("gaps out", style, Style.SCREEN_GAPS_OUT)
             Stepper("border width", style, Style.SCREEN_BORDER_WIDTH)
-            // keybar.owl reads these as gapsIn, gapsOut and borderWidth.
-            Heading("extra keys")
-            Stepper("gaps in", style, Style.KEYBAR_GAPS_IN)
+            // keybar.owl reads these as gapsOut and borderWidth.
+            Heading("terminal key bar")
+            KeybarOption(runtime, onAgent)
             Stepper("gaps out", style, Style.KEYBAR_GAPS_OUT)
             Stepper("border width", style, Style.KEYBAR_BORDER_WIDTH)
             // Both bars at once; style.toml can set them apart. Background is the band behind their icons.
@@ -188,6 +192,74 @@ fun StyleScreen(
             }
         }
     }
+}
+
+/**
+ * The terminal key bar over the keyboard: keybar.owl, as stock, edited or broken, with a dropdown to start the agent on
+ * it or put the stock keys back. Here because nothing else says the bar is a file of the user's; gone (removed), it's
+ * left out, and the stock keys show.
+ */
+@Composable
+private fun KeybarOption(
+    runtime: Runtime,
+    onAgent: (title: String, command: (bin: String) -> String) -> Unit,
+) {
+    val spec = runtime.widgets.specs.firstOrNull { it.file.name == WidgetEngine.KEYBAR } ?: return
+    val stockFile = File(spec.file.parentFile, WidgetEngine.STOCK_KEYBAR)
+    // Whether it's still the bar as shipped; read again when the file reloads, which makes a new spec.
+    val stock = remember(spec) { runCatching { spec.file.readBytes().contentEquals(stockFile.readBytes()) }.getOrDefault(false) }
+    val scope = rememberCoroutineScope()
+    var open by remember { mutableStateOf(false) }
+    var restoring by remember { mutableStateOf(false) }
+    val actions = listOfNotNull(KeybarAction.Edit, KeybarAction.Stock.takeIf { !stock })
+    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        OptionLabel("keys")
+        Box(Modifier.weight(1f, fill = false)) {
+            Row(
+                Modifier
+                    .frame(1.dp, Palette.border, radius = 12.dp)
+                    .clickable { open = !open }
+                    .padding(start = 14.dp, end = 10.dp, top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                BasicText(
+                    when {
+                        spec.program == null -> "has errors"
+                        stock -> "stock"
+                        else -> "edited"
+                    },
+                    style = Mono.copy(color = if (spec.program == null) Palette.red else Palette.foreground),
+                )
+                Symbol(if (open) Glyph.ChevronUp else Glyph.ChevronDown, Palette.muted, Modifier.padding(start = 6.dp))
+            }
+            if (open) {
+                ChoicePopup(actions, null, BelowAnchorStart, onDismiss = { open = false }, onPick = { action ->
+                    when (action) {
+                        KeybarAction.Edit -> onAgent("Edit ${spec.name}") { editWidgetCommand(it, spec) }
+                        KeybarAction.Stock -> restoring = true
+                    }
+                }, label = { it.label })
+            }
+        }
+    }
+    OptionHint(spec.file.name)
+    if (restoring) {
+        ConfirmDialog(
+            "back to the stock keys?",
+            "Your keybar.owl is replaced with the one this launcher ships.",
+            "replace",
+            onDismiss = { restoring = false },
+        ) {
+            restoring = false
+            // The widgets folder is watched: the new file reloads the bar.
+            scope.launch(Dispatchers.IO) { runCatching { stockFile.copyTo(spec.file, overwrite = true) } }
+        }
+    }
+}
+
+private enum class KeybarAction(val label: String) {
+    Edit("edit with agent"),
+    Stock("back to stock"),
 }
 
 /** The installed themes in a row, starting at the current one; browse has Omarchy's whole catalog. */

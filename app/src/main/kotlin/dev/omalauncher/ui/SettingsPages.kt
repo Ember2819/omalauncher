@@ -113,7 +113,7 @@ private fun SettingsPage(
                 onLicenses = { stack.push(SettingsPage.Licenses) },
                 onGestures = { stack.push(SettingsPage.Gestures) },
             )
-        SettingsPage.Style -> StyleScreen(runtime, onDismiss = close, onBrowse = { stack.push(SettingsPage.Themes) })
+        SettingsPage.Style -> StyleScreen(runtime, onDismiss = close, onBrowse = { stack.push(SettingsPage.Themes) }, onAgent = ::agent)
         SettingsPage.Pages -> {
             var sharing by remember { mutableStateOf<WidgetSpec?>(null) }
             PagesScreen(runtime, onDismiss = close, onAgent = ::agent, onShare = { sharing = it })
