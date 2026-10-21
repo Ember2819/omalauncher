@@ -117,7 +117,7 @@ private class Painter(
     fun eval(
         ev: dev.omalauncher.widgets.lang.Ev,
         env: Env,
-    ): Value = inst.budget.run { ev(env) }
+    ): Value = inst.budget.eval(ev, env)
 
     fun DrawScope.paint(
         nodes: List<WNode>,

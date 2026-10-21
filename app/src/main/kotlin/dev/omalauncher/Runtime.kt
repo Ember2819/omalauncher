@@ -414,14 +414,13 @@ class Runtime(
         mono: Boolean,
     ): ImageBitmap? {
         val program = spec.program ?: return null
-        val image = program.iconImage
-        val svg = program.icon
-        if (image == null && svg == null) return null
+        val key = program.iconKey ?: return null
         val accent = Palette.accent.toArgb()
         val size = (52 * context.resources.displayMetrics.density).toInt()
         val drawn =
-            owlIcons.getOrPut((svg ?: "image:" + image.contentHashCode()) to accent) {
-                val bmp = if (image != null) decodeImageIcon(image, size) else decodeSvgIcon(svg!!, size, accent)
+            owlIcons.getOrPut(key to accent) {
+                val image = program.iconImage
+                val bmp = if (image != null) decodeImageIcon(image, size) else decodeSvgIcon(program.icon!!, size, accent)
                 bmp?.let { it.asImageBitmap() to bitmapMask(it).asImageBitmap() }
             }
         return if (mono) drawn?.second else drawn?.first

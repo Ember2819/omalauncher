@@ -1342,8 +1342,12 @@ class Compiler private constructor(
             is Expr.Interp -> {
                 val parts = e.parts.map { ex(it, s) }
                 // Values are trimmed (command output ends in newlines); the literal text around them isn't.
-                val literal = e.parts.map { it is Expr.Lit && it.value is Str }
-                fold(parts) { env -> Str(parts.withIndex().joinToString("") { (i, p) -> p(env).let { v -> if (literal[i]) v.toString() else v.text() } }) }
+                val literal = BooleanArray(e.parts.size) { e.parts[it].let { p -> p is Expr.Lit && p.value is Str } }
+                fold(parts) { env ->
+                    val sb = StringBuilder()
+                    for (i in parts.indices) parts[i](env).let { v -> sb.append(if (literal[i]) v.toString() else v.text()) }
+                    Str(sb.toString())
+                }
             }
             is Expr.ListLit -> {
                 val items = e.items.map { ex(it, s) }

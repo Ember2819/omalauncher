@@ -80,6 +80,19 @@ class Budget(
         }
     }
 
+    /** run { ev(env) } without a closure: it wraps every binding read and Canvas argument, per frame. */
+    fun eval(
+        ev: Ev,
+        env: Env,
+    ): Value {
+        if (depth++ == 0) steps = 0
+        try {
+            return ev(env)
+        } finally {
+            depth--
+        }
+    }
+
     fun tick(n: Int = 1) {
         steps += n
         if (steps > limit) throw WidgetError("too much work in one update (over $limit steps)")
@@ -370,4 +383,7 @@ class Program(
     val iconImage: ByteArray? = null,
     /** What compiles but is likely wrong, one line each with its line:col, for owl-check: a URL value not put through enc(). */
     val warnings: List<String> = emptyList(),
-)
+) {
+    /** [icon] or [iconImage] as a cache key, hashed once: the launcher looks icons up on every recomposition. */
+    val iconKey: String? by lazy { icon ?: iconImage?.let { "image:" + it.contentHashCode() } }
+}

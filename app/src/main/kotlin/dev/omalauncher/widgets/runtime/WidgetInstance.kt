@@ -540,7 +540,7 @@ class WidgetInstance(
     ): Value {
         ev.const?.let { return it }
         return try {
-            budget.run { ev(env) }
+            budget.eval(ev, env)
         } catch (e: WidgetError) {
             report("$where: ${e.message}")
             Null

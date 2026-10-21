@@ -182,6 +182,8 @@ object Builtins {
 
     private val regexCache = HashMap<String, Regex>()
 
+    private val WHITESPACE = Regex("\\s+")
+
     private fun regex(p: String) = synchronized(regexCache) { regexCache.getOrPut(p) { Regex(p) } }
 
     /** By pattern, and by language tag after a NUL when a widget names one. */
@@ -546,7 +548,7 @@ object Builtins {
             "capitalize" to Builtin(1, 1) { a -> Str(a.str(0).replaceFirstChar { it.titlecase() }) }.strict(),
             "lower" to Builtin(1, 1) { a -> Str(a.str(0).lowercase()) },
             "lines" to Builtin(1, 1) { a -> lst(a.str(0).lines().filter { it.isNotBlank() }.map(::Str)) },
-            "words" to Builtin(1, 1) { a -> lst(a.str(0).trim().split(Regex("\\s+")).filter { it.isNotEmpty() }.map(::Str)) },
+            "words" to Builtin(1, 1) { a -> lst(a.str(0).trim().split(WHITESPACE).filter { it.isNotEmpty() }.map(::Str)) },
             "split" to Builtin(2, 2) { a -> lst(a.str(0).split(a.str(1)).map(::Str)) },
             "join" to Builtin(1, 2) { a -> Str(a.list(0).joinToString(if (a.size > 1) a.str(1) else "") { if (it is Str) it.v else it.toString() }) },
             "replace" to Builtin(3, 3) { a -> Str(a.str(0).replace(a.str(1), a.str(2))) },
