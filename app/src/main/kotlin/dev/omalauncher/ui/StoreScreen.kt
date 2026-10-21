@@ -65,7 +65,7 @@ import kotlinx.coroutines.launch
  * and one per installed coding agent), then reviewed widgets from the marketplace repo as a grid of
  * previews, with search and category tabs (and one for the newest). Faces and apps: the reviewed ones, the same way.
  * Tapping one opens its page, which shows what it installs and runs; from there a widget goes on the current page,
- * a face left of page 1 and an app in the drawer (or any of them updates).
+ * a face left of page 1 and an app in the drawer (or any of them updates). An installed app opens from its page too.
  */
 @Composable
 fun StoreScreen(
@@ -77,6 +77,8 @@ fun StoreScreen(
     onDismiss: () -> Unit,
     /** The kind it opens on. */
     initialKind: OwlKind = OwlKind.Widget,
+    /** Opens the installed app in this file, as the drawer does. */
+    onOpenApp: (String) -> Unit = {},
 ) {
     var kind by remember { mutableStateOf(initialKind) }
     val market = engine.market(kind)
@@ -127,6 +129,7 @@ fun StoreScreen(
                         page = page,
                         message = message,
                         modifier = modifier,
+                        onOpen = { market.installedVersion(e)?.let { onOpenApp(it.file) } },
                         onInstall = {
                             scope.launch {
                                 message = market.install(e, page)
@@ -488,6 +491,7 @@ private fun Detail(
     page: Int,
     message: String?,
     modifier: Modifier,
+    onOpen: () -> Unit,
     onInstall: () -> Unit,
 ) = key(e.id) {
     val installed = market.installedVersion(e)
@@ -530,6 +534,13 @@ private fun Detail(
             busy != null -> BasicText(busy, style = Mono.copy(color = Palette.accent))
             !e.supported -> BasicText("needs a newer launcher (owl ${e.owl}); update the launcher to install it", style = Mono.copy(color = Palette.red, fontSize = TextSize.Small))
             update -> BracketAction("update ${installed?.version} → ${e.version}", Palette.accent, onInstall)
+            // An app opens from here, unless it waits for Linux.
+            installed != null && market.kind == OwlKind.App && (linux || !e.needsLinux) ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    AddedMark(market.kind)
+                    Spacer(Modifier.width(8.dp))
+                    BracketAction("open", Palette.accent, onOpen)
+                }
             installed != null -> AddedMark(market.kind)
             else ->
                 BracketAction(
