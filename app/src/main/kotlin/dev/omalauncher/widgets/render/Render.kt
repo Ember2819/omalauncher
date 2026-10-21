@@ -897,9 +897,14 @@ private fun handlers(p: Props): Modifier {
                                     }
                                 }
                             }
-                        waitForUpOrCancellation()
-                        repeating?.cancel()
-                        release?.run(p.env, emptyList())
+                        // Also when the node goes while it's held (the keyboard closes, the screen turns): a key's
+                        // pressed look kept in state would otherwise stay on until the next touch.
+                        try {
+                            waitForUpOrCancellation()
+                        } finally {
+                            repeating?.cancel()
+                            release?.run(p.env, emptyList())
+                        }
                     }
                 }
             }
