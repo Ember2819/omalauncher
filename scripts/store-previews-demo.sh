@@ -4,7 +4,7 @@
 # Assistant's states are files that curl reads, `curl` answers Cursor's dashboard (cursor-plan, grok-bot), and
 # the Tesla tile reads its own fixture, go-limit reads an OpenCode database, `python3` answers
 # google-calendar's feed script and lastfm's helper, and two sleeping `claude` processes stand in for claude-top's
-# Claude Code instances. `python` answers
+# and alorse/claude's Claude Code instances. `python` answers
 # codex-quota's and photoprism-random's scripts, widget-maker finds its script set up and a
 # draft waiting, and `ssh` streams a Flipper menu to flipper-zero. `agy` answers agy-limits, agenda
 # reads two calendars from local .ics files, 9g420's codex-quota reads a Codex session, and the
@@ -63,6 +63,7 @@ aside() { [ -f "$1" ] && [ ! -f "$1.before-demo" ] && mv "$1" "$1.before-demo"; 
 
 if [ "${1:-}" = off ]; then
   for p in $(cat "$demo/claude.pids" 2>/dev/null); do kill "$p" 2>/dev/null; rm -f ~/.claude/sessions/"$p".json; done
+  rm -rf ~/.claude/projects/-demo-widgets
   pid=$(cat ~/.cache/owl-flipper/feed.pid 2>/dev/null) && kill -- "-$pid" 2>/dev/null
   [ -f "$demo/agenda-cache-new" ] && rm -rf ~/.cache/gcal-agenda
   [ -f "$demo/nostr-cache-new" ] && rm -rf ~/.cache/nostr-inbox
@@ -231,6 +232,10 @@ PY
 printf '%s\n' '{"ok":true,"ip":"192.168.1.40","did":"123456789","status":4,"status_text":"Charging","busy":false,"fault":2103,"fault_warn":false,"fault_text":"docked","battery":87,"mode":1,"mode_text":"Sweep + mop","sweep_type":0,"sweep_text":"Global","suction":2,"suction_text":"Medium","water":1,"water_text":"Mid","mop_route":1,"mop_text":"Y","minutes":42,"area":58,"map_url":"","consumables":{"side_brush":71,"main_brush":84,"filter":63,"mop":38}}' > "$demo/vacuum.json"
 cat > /usr/local/bin/python3 <<'EOF'
 #!/bin/sh
+# alorse/claude reads the sessions with python3 - : start them, like pgrep does for claude-top.
+if [ "$*" = - ] && [ -f /tmp/store-previews-demo/claude.sh ] && [ ! -f /tmp/store-previews-demo/claude.pids ]; then
+  bash /tmp/store-previews-demo/claude.sh </dev/null
+fi
 case "$*" in
   *owl-gcal*) exec /usr/bin/python3 /tmp/store-previews-demo/gcal.py ;;
   *lastfm.py\ fetch*) exec /usr/bin/python3 /tmp/store-previews-demo/lastfm.py ;;
@@ -263,12 +268,17 @@ while True:
     time.sleep(1 - $busy)" </dev/null >/dev/null 2>&1) &
   local pid=$!
   echo "$pid" >> "$demo/claude.pids"
-  printf '{"sessionId":"%s","name":"%s","status":"%s","cwd":"%s","version":"2.4.1","statusUpdatedAt":%s,"startedAt":%s}\n' \
-    "$sid" "${cwd##*/}" "$status" "$cwd" $(( ms - 40000 )) $(( ms - ago * 60000 )) > ~/.claude/sessions/"$pid".json
+  printf '{"pid":%s,"sessionId":"%s","name":"%s","status":"%s","cwd":"%s","version":"2.4.1","statusUpdatedAt":%s,"startedAt":%s}\n' \
+    "$pid" "$sid" "${cwd##*/}" "$status" "$cwd" $(( ms - 40000 )) $(( ms - ago * 60000 )) > ~/.claude/sessions/"$pid".json
   printf '{"display":"%s","sessionId":"%s"}\n' "$prompt" "$sid" >> ~/.claude/history.jsonl
 }
 claude ~/Projects/omarchy-widgets demo-widgets busy 410 0.3 "render the themed previews for the new widgets" 52
 claude ~/Projects/website demo-website idle 280 0 "fix the header on small screens" 140
+# A subagent at work in the busy session, for alorse/claude.
+sub=~/.claude/projects/-demo-widgets/demo-widgets/subagents
+mkdir -p "$sub"
+echo '{"description":"Check the renders","model":"claude-sonnet-5-5"}' > "$sub/agent-demo.meta.json"
+: > "$sub/agent-demo.jsonl"
 sleep 0.5
 EOF
 cat > /usr/local/bin/pgrep <<'EOF'
