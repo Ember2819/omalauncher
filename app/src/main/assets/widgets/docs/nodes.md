@@ -67,8 +67,8 @@ corners` for cards and album art, `3 * corners` for small chips, and the same in
 doesn't. It needs `meta { owl: 6 }`.
 
 `gapsIn`, `gapsOut` and `borderWidth` are the user's widget gaps and border width in dp, from settings › style: a
-widget with a frame of its own can space and outline it like home's tiles (`border: borderWidth`). In a keybar they're
-the extra keys' own settings instead. They need `meta { owl: 12 }`.
+widget with a frame of its own can space and outline it like home's tiles (`border: borderWidth`). In a keybar `gapsOut`
+and `borderWidth` are the extra keys' own settings instead. They need `meta { owl: 12 }`.
 
 ## Text in a Row
 

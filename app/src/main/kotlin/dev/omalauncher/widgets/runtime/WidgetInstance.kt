@@ -426,11 +426,11 @@ class WidgetInstance(
         return v?.let { Num(Math.round(it).toDouble()) } ?: Null
     }
 
-    /** The style setting [tile]'s gapsIn, gapsOut or borderWidth reads: the extra keys' own in a keybar, else the widgets'. */
+    /** The style setting [tile]'s gapsIn, gapsOut or borderWidth reads: the widgets', but the extra keys' own gapsOut and borderWidth in a keybar. */
     private fun frameSetting(name: String): Setting.Number {
         val keybar = program.kind == OwlKind.Keybar
         return when (name) {
-            "gapsIn" -> if (keybar) Style.KEYBAR_GAPS_IN else Style.GAPS_IN
+            "gapsIn" -> Style.GAPS_IN
             "gapsOut" -> if (keybar) Style.KEYBAR_GAPS_OUT else Style.GAPS_OUT
             else -> if (keybar) Style.KEYBAR_BORDER_WIDTH else Style.TILE_BORDER_WIDTH
         }

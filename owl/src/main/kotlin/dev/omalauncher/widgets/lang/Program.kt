@@ -25,7 +25,7 @@ interface Host {
      * navigation bar covers, for an app with `edge` and a face, or the keyboard while a face's field has it), screenTop (how
      * much of an app's top a camera cutout covers, with `statusBar: false`), linux: whether Linux is installed and running,
      * corners: the launcher's corner style as a radius scale, 0 (edge), 0.5 (soft) or 1 (round), and gapsIn, gapsOut and
-     * borderWidth: its widgets' gaps and border width in dp, or in a keybar the extra keys' own.
+     * borderWidth: its widgets' gaps and border width in dp, in a keybar the extra keys' own gapsOut and borderWidth.
      */
     fun tile(name: String): Value = Null
 

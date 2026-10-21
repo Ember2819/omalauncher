@@ -79,13 +79,13 @@ keybar "extra keys" {
   }
 
   // Framed like the tiles above it, by the extra keys' gaps and border width in settings › style: gapsOut to the
-  // screen's sides and the keyboard, gapsIn between the keys and to the frame.
+  // screen's sides and the keyboard. 6 between the keys and to the frame, half of it around each key.
   Column {
     padding: [gapsOut, 0, gapsOut, gapsOut]
     gap: 0
     Column {
       gap: 0
-      padding: gapsIn / 2
+      padding: 3
       background: background
       border: borderWidth
       borderColor: border
@@ -98,7 +98,7 @@ keybar "extra keys" {
             Box {
               weight: 1
               fill: height
-              padding: gapsIn / 2
+              padding: 3
               if k.latch != null {
                 Latched { k: k }
               } else {
