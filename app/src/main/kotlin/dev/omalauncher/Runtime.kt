@@ -214,6 +214,20 @@ class Runtime(
     /** Continues a failed install, or a failed update of an installed system. */
     fun retryLinux() = runLinux { bootstrap.run() }
 
+    /** Stops an install that hasn't completed, running or failed, and deletes what it downloaded and unpacked. */
+    fun cancelLinux() {
+        val install = linuxJob
+        if (!bootstrap.cancel()) return
+        linuxJob =
+            scope.launch {
+                install?.cancel()
+                withContext(Dispatchers.IO) { proot.killAll() }
+                install?.join()
+                bootstrap.remove()
+                setService(false)
+            }
+    }
+
     /** Runs [work] with the foreground service up, so it goes on outside the app; then starts Linux if it's installed. */
     private fun runLinux(work: suspend () -> Unit) {
         if (linuxJob?.isActive == true) return
