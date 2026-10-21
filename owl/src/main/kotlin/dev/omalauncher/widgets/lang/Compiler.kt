@@ -700,6 +700,22 @@ class Compiler private constructor(
         webFile(e, s, "font")
     }
 
+    /**
+     * The fonts named in a Text's or a Canvas text's spans, `[{text: "a", font: "https://…"}]`: listed and level-checked
+     * like a `font:`. They loaded without either, so a font from any server went unseen in the review.
+     */
+    private fun spanFonts(
+        e: Expr,
+        s: Scope,
+    ) {
+        when (e) {
+            is Expr.ListLit -> e.items.forEach { spanFonts(it, s) }
+            is Expr.MapLit -> e.entries.firstOrNull { it.first == "font" }?.let { font(it.second, s) }
+            is Expr.Cond -> listOf(e.a, e.b).forEach { spanFonts(it, s) }
+            else -> {}
+        }
+    }
+
     /** The text [e] starts with whatever its values turn out to be: "https://x.test/" for "https://x.test/${id}.svg". */
     private fun constantStart(
         e: Expr,
@@ -929,6 +945,7 @@ class Compiler private constructor(
         if (c.name == "image") webFile(c.args[0], scope, "image")
         if (c.name == "text" && c.named.any { it.first in TEXT_STYLE }) since(CANVAS_TEXT_STYLE, c.pos)
         c.named.firstOrNull { it.first == "font" }?.let { font(it.second, scope) }
+        if (c.name == "text") c.args.firstOrNull()?.let { spanFonts(it, scope) }
         nodes++
         return WNode.Draw(
             c.name,
@@ -968,6 +985,7 @@ class Compiler private constructor(
                 if (body.handlers.none { it.name == "onPress" }) fail("repeats runs onPress again while the finger stays down: add onPress", p.pos)
             }
             if (p.name == "font") font(p.value, scope)
+            if (p.name == "spans") spanFonts(p.value, scope)
             props[p.name] = if (n.type == "Image" && p.name == "src") whole { prop(p, scope) } else prop(p, scope)
         }
         val handlers =

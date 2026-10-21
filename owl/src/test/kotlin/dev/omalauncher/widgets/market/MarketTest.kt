@@ -114,6 +114,9 @@ class MarketTest {
         assertTrue(Review.risks(listOf("http GET (a URL built from widget values)")).single().contains("send its data anywhere"))
         assertTrue(Review.risks(listOf("http POST (a URL built from widget values)")).single().contains("send its data anywhere"))
         assertTrue(Review.risks(listOf("http POST https://a.b/c/${Compiler.VALUE}")).isEmpty())
+        for (method in listOf("PUT", "PATCH", "DELETE")) {
+            assertTrue(Review.risks(listOf("http $method (a URL built from widget values)")).single().contains("send its data anywhere"))
+        }
     }
 
     @Test fun theStoreTakesValuesInCommandsOnlyQuoted() {

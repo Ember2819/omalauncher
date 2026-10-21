@@ -708,6 +708,17 @@ class LangTest {
         assertEquals("[1, 2, 3]", text("matchAll(s, \"\\\\d\")", "state s = \"1a2b3\""))
     }
 
+    /** A font in spans is listed for review like a `font:`, in a Text and in a Canvas text. */
+    @Test fun fontsInSpansAreListed() {
+        val p =
+            Compiler.compile(
+                "widget \"t\" {\nmeta { owl: 10 }\nstate u = \"x\"\n" +
+                    "Column { Text { spans: [\"a \", {text: \"b\", font: \"https://evil.test/f.ttf\"}] }\n" +
+                    "Canvas { text([{text: \"c\", font: u == \"x\" ? \"https://other.test/g.ttf\" : \"serif\"}], 0, 0) } }\n}",
+            )
+        assertEquals(setOf("font GET https://evil.test/f.ttf", "font GET https://other.test/g.ttf"), p.commands.toSet())
+    }
+
     /** -0.0 is zero and nothing compares with NaN, on both the fast path and the general one. */
     @Test fun negativeZeroAndNaNCompareAsNumbers() {
         val d = "state x = 0\nstate t = \"-0\"\nstate nan = \"NaN\""
