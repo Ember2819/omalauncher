@@ -7,6 +7,9 @@ import androidx.compose.runtime.mutableIntStateOf
 import android.app.WallpaperManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.rememberUpdatedState
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import dev.omalauncher.widgets.FACE_PAGE
 import dev.omalauncher.widgets.isFacePage
 import dev.omalauncher.widgets.lang.OwlKind
@@ -98,12 +101,19 @@ fun HomeScreen(
     fun slotOf(page: Int) = slots.indexOfFirst { page in it }
     // Home opens on page 1, not left of it; on the first tile page, if a layout from before faces has none numbered 1.
     val pager = rememberPagerState(initialPage = slotOf(pageNumbers.firstOrNull { it >= 1 } ?: 1).coerceAtLeast(0)) { slots.size }
-    // A tile dropped on another page: show that page once the page list has caught up.
+    // A tile dropped on another page: show that page once the page list has caught up, by the list as it is then. The
+    // list the request was made with could be one from before (a store add spilling onto page 2 showed a face). A swipe
+    // meanwhile wins, and the request goes with it rather than firing later.
     var showPage by remember { mutableStateOf<Int?>(null) }
-    LaunchedEffect(showPage, slots) {
-        val i = showPage?.let(::slotOf) ?: return@LaunchedEffect
-        if (i >= 0) pager.scrollToPage(i)
-        showPage = null
+    val currentSlots by rememberUpdatedState(slots)
+    LaunchedEffect(showPage) {
+        val page = showPage ?: return@LaunchedEffect
+        try {
+            withTimeoutOrNull(2_000) { snapshotFlow { currentSlots.indexOfFirst { page in it } }.first { it >= 0 } }?.let { pager.scrollToPage(it) }
+        } finally {
+            // Not when another page was asked for meanwhile: that one runs this again.
+            if (showPage == page) showPage = null
+        }
     }
     var menuFor by remember { mutableStateOf<HomeItem?>(null) }
 
