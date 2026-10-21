@@ -66,6 +66,10 @@ corners` for cards and album art, `3 * corners` for small chips, and the same in
 `radius` follow it on their own; a fixed `radius`, a clipped Box, an Image or a Canvas shape
 doesn't. It needs `meta { owl: 6 }`.
 
+`gapsIn`, `gapsOut` and `borderWidth` are the user's widget gaps and border width in dp, from settings › style: a
+widget with a frame of its own can space and outline it like home's tiles (`border: borderWidth`). In a keybar they're
+the extra keys' own settings instead. They need `meta { owl: 12 }`.
+
 ## Text in a Row
 
 Since owl 10 a Text in a Row or Flow is as wide as its text, like a Button: labels, chips and values sit side by

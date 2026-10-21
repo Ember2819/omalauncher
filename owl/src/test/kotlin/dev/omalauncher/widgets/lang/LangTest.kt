@@ -616,6 +616,20 @@ class LangTest {
         assertTrue(compileError("widget {\n meta { owl: 5 }\n Text { text: corners } }").contains("corners needs owl 6"))
     }
 
+    @Test fun gapsAndBorderFollowTheLauncherStyle() {
+        val style =
+            object : Host by TestHost(0) {
+                override fun tile(name: String): Value = mapOf("gapsIn" to Num(4.0), "gapsOut" to Num(6.0), "borderWidth" to Num(2.0))[name] ?: Null
+            }
+        val p = Compiler.compile("keybar \"k\" {\n meta { owl: 12 }\n Text { text: \"${'$'}{gapsIn / 2 + gapsOut + borderWidth}\" } }")
+        assertEquals("10", (p.screen!!.single() as WNode.Element).props["text"]!!(Env.root(style)).text())
+        assertTrue(compileError("widget {\n meta { owl: 11 }\n Box { border: borderWidth } }").contains("borderWidth needs owl 12"))
+        // A widget's own names win at any level, as with `rows`: files from before owl 12 may use them.
+        assertEquals("3", text("borderWidth", "state borderWidth = 3"))
+        assertEquals("5", text("gapsIn + 1", "let gapsIn = 4"))
+        Compiler.compile("widget {\n meta { owl: 10 }\n component C(gapsOut) { Box { padding: gapsOut } }\n C { gapsOut: 2 } }")
+    }
+
     @Test fun requiresDeclaresPackagesPerManager() {
         val p = Compiler.compile("widget {\n  requires { pacman: [\"jq\", \"curl\"] }\n  requires { pacman: \"jq\" }\n  Text { text: \"x\" }\n}")
         assertEquals(mapOf("pacman" to listOf("jq", "curl")), p.requires)

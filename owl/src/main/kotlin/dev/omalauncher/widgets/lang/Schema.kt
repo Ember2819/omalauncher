@@ -123,6 +123,8 @@ internal val SINCE =
         mapOf("screenTop" to 12) +
         // owl 12: the extra keys over the soft keyboard as a file; keys for the focused Linux window; touches as they go down.
         listOf(KEYBAR_FILE, "pressKey", "typeText", "latch", "android.modifiers", "onPress", "onRelease", "repeats").associateWith { 12 } +
+        // owl 12: the launcher's gaps and border width, the extra keys' own in a keybar.
+        listOf("gapsIn", "gapsOut", "borderWidth").associateWith { 12 } +
         // owl 12: requests other than POST; base64 text.
         listOf(POST_METHOD, "toBase64", "fromBase64").associateWith { 12 } +
         // owl 12: tokens kept encrypted, which only go into requests, and fields that hide what's typed.
@@ -219,7 +221,7 @@ internal val ACTION_WORDS =
     )
 
 /** The tile's size, readable anywhere a declaration of the same name doesn't shadow it. */
-internal val TILE = setOf("cols", "rows", "tileWidth", "tileHeight", "screenWidth", "screenHeight", "screenInset", "screenTop", "corners")
+internal val TILE = setOf("cols", "rows", "tileWidth", "tileHeight", "screenWidth", "screenHeight", "screenInset", "screenTop", "corners", "gapsIn", "gapsOut", "borderWidth")
 
 /** Builtins that always give a number (or null, which reads as …). */
 internal val NUMBERS = setOf("int", "round", "floor", "ceil", "abs", "fixed", "len", "count", "sum", "min", "max", "clamp")

@@ -138,6 +138,11 @@ fun StyleScreen(
             Heading("screens")
             Stepper("gaps out", style, Style.SCREEN_GAPS_OUT)
             Stepper("border width", style, Style.SCREEN_BORDER_WIDTH)
+            // keybar.owl reads these as gapsIn, gapsOut and borderWidth.
+            Heading("extra keys")
+            Stepper("gaps in", style, Style.KEYBAR_GAPS_IN)
+            Stepper("gaps out", style, Style.KEYBAR_GAPS_OUT)
+            Stepper("border width", style, Style.KEYBAR_BORDER_WIDTH)
             // Both bars at once; style.toml can set them apart. Background is the band behind their icons.
             Heading("system bars")
             Flag("status bar", "shown", "hidden", style, Style.STATUS_BAR_SHOWN)

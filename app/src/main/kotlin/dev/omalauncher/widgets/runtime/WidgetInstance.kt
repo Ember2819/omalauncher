@@ -23,6 +23,8 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.structuralEqualityPolicy
 import androidx.compose.ui.graphics.toArgb
 import dev.omalauncher.linux.ShellResult
+import dev.omalauncher.theme.Setting
+import dev.omalauncher.theme.Style
 import dev.omalauncher.ui.EmbeddedTerminal
 import dev.omalauncher.ui.LauncherStyle
 import dev.omalauncher.ui.Palette
@@ -38,6 +40,7 @@ import dev.omalauncher.widgets.lang.Lst
 import dev.omalauncher.widgets.lang.MAX_TEXT
 import dev.omalauncher.widgets.lang.Null
 import dev.omalauncher.widgets.lang.Num
+import dev.omalauncher.widgets.lang.OwlKind
 import dev.omalauncher.widgets.lang.Obj
 import dev.omalauncher.widgets.lang.TRUE
 import dev.omalauncher.widgets.lang.FALSE
@@ -409,6 +412,7 @@ class WidgetInstance(
             when (name) {
                 "linux" -> return bool(linux())
                 "corners" -> return Num(LauncherStyle.cornerScale.toDouble())
+                "gapsIn", "gapsOut", "borderWidth" -> return Num(LauncherStyle.style[frameSetting(name)])
                 "screenWidth" -> screenSize.value[0]
                 "screenHeight" -> screenSize.value[1]
                 "screenInset" -> screenInset.doubleValue
@@ -420,6 +424,16 @@ class WidgetInstance(
                 else -> null
             }
         return v?.let { Num(Math.round(it).toDouble()) } ?: Null
+    }
+
+    /** The style setting [tile]'s gapsIn, gapsOut or borderWidth reads: the extra keys' own in a keybar, else the widgets'. */
+    private fun frameSetting(name: String): Setting.Number {
+        val keybar = program.kind == OwlKind.Keybar
+        return when (name) {
+            "gapsIn" -> if (keybar) Style.KEYBAR_GAPS_IN else Style.GAPS_IN
+            "gapsOut" -> if (keybar) Style.KEYBAR_GAPS_OUT else Style.GAPS_OUT
+            else -> if (keybar) Style.KEYBAR_BORDER_WIDTH else Style.TILE_BORDER_WIDTH
+        }
     }
 
     var time: Double

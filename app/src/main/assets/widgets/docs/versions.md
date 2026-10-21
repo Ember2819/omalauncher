@@ -24,5 +24,5 @@ file only this phone runs, `owl: 12` is fine; for the store, a lower level reach
 - **11**: `android.drawer`, `appAction`, `workApps`, `rank`, `strongMatch`, `chunk`, Column's and Grid's `lazy` and
   `reverse`, `panel "…" { }` files with `query`, `enter`, `onSubmit` and `onKey`, `shortcuts`, Image's `label`, Text's
   `minLines` and an app's `statusBar`. A Column in a Row is as wide as its content
-- **12**: `screenTop`, `keybar "…" { }` files, `pressKey`, `typeText`, `latch`, `android.modifiers`, `onPress`,
+- **12**: `screenTop`, `gapsIn`, `gapsOut`, `borderWidth`, `keybar "…" { }` files, `pressKey`, `typeText`, `latch`, `android.modifiers`, `onPress`,
   `onRelease`, `repeats`, post's `method:`, `toBase64`, `fromBase64`, `secret` states and Input's `password`
