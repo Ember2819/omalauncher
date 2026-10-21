@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs in the guest, for scripts/store-previews.sh: demo data for the store widgets that
 # otherwise only say how to set them up. `gh` answers like a signed-in account, Home
-# Assistant's states are files that curl reads, `curl` answers Cursor's dashboard, and
+# Assistant's states are files that curl reads, `curl` answers Cursor's dashboard (cursor-plan, grok-bot), and
 # the Tesla tile reads its own fixture, go-limit reads an OpenCode database, `python3` answers
 # google-calendar's feed script and lastfm's helper, and two sleeping `claude` processes stand in for claude-top's
 # Claude Code instances. `python` answers
@@ -118,7 +118,7 @@ state switch.coffee_machine on "Coffee machine"
 aside "$ha"
 printf 'file://%s\ndemo\nlight.living_room\nlight.kitchen\nsensor.indoor\nsensor.power\nlock.front_door\nswitch.coffee_machine\n' "$demo" > "$ha"
 
-# Cursor's Pro+ plan, from the cursor-plan author's own picture. Everything else goes to curl.
+# Cursor's Pro+ plan, from the cursor-plan author's own picture, and grok-bot's weekly usage. Everything else goes to curl.
 aside "$cursor"
 echo '{"accessToken":"demo"}' > "$cursor"
 cat > /usr/local/bin/curl <<'EOF'
@@ -126,6 +126,11 @@ cat > /usr/local/bin/curl <<'EOF'
 case "$*" in
   *DashboardService/GetCurrentPeriodUsage*) echo '{"billingCycleEnd":"1792627200000","planUsage":{"totalPercentUsed":77,"apiPercentUsed":96,"includedSpend":7000,"limit":7000}}' ;;
   *DashboardService/GetPlanInfo*) echo '{"planInfo":{"planName":"Pro+","price":"$60/mo"}}' ;;
+  # grok-bot writes the answer to -o and reads the status from -w.
+  *DashboardService/GetSandUsageStatus*)
+    while [ $# -gt 0 ]; do [ "$1" = -o ] && out=$2; shift; done
+    echo '{"grokPlanLabel":"Grok Bot","cursorPlanName":"Pro+","usagePercent":42,"nextResetTimestampUtc":"2026-10-26T00:00:00.000Z"}' > "$out"
+    printf 200 ;;
   *) exec /usr/bin/curl "$@" ;;
 esac
 EOF
