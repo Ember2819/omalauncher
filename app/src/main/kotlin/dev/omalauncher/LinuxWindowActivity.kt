@@ -47,6 +47,7 @@ import dev.omalauncher.ui.KeyboardSink
 import dev.omalauncher.ui.Mono
 import dev.omalauncher.ui.Palette
 import dev.omalauncher.ui.linuxWindowInput
+import dev.omalauncher.ui.SystemBarsEffect
 import dev.omalauncher.ui.applySystemBars
 import dev.omalauncher.wayland.WindowRenderer
 import dev.omalauncher.wayland.XdgToplevel
@@ -71,7 +72,7 @@ class LinuxWindowActivity : InstantActivity() {
         this.window = window
         applySystemBars(this, Palette.isLight)
         setInstantContent {
-            LaunchedEffect(Palette.isLight) { applySystemBars(this@LinuxWindowActivity, Palette.isLight) }
+            SystemBarsEffect(this@LinuxWindowActivity)
             AppWindow(runtime, window)
             BackHandler { backInstantly() }
             LaunchedEffect(window) {

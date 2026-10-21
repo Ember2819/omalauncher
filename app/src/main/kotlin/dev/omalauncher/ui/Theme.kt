@@ -4,7 +4,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -13,6 +15,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
@@ -291,6 +294,16 @@ fun applySystemBars(
             androidx.activity.SystemBarStyle.dark(transparent)
         }
     activity.enableEdgeToEdge(style, style)
+}
+
+/**
+ * [applySystemBars] whenever the theme turns light or dark, and after every configuration change: a fold put the bars
+ * back as the window had them at the start, white icons on a theme that had turned light since.
+ */
+@Composable
+fun SystemBarsEffect(activity: androidx.activity.ComponentActivity) {
+    val configuration = LocalConfiguration.current
+    LaunchedEffect(Palette.isLight, configuration) { applySystemBars(activity, Palette.isLight) }
 }
 
 /** Home's or an app's status bar, or none: a swipe down from the top edge still brings it back for a moment, and the shade. */
