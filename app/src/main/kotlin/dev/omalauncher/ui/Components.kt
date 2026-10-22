@@ -216,10 +216,19 @@ fun Modifier.card(
         .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
         .padding(padding)
 
-/** Commands or a widget's source, small, scrolling sideways rather than wrapping. Keys read through it every way. */
+/**
+ * Commands or a widget's source, small, scrolling sideways rather than wrapping. Keys read through it every way.
+ * Lines are cut at [MAX_CODE_LINE]: each is measured whole, and Compose can't lay out one wider than about 16M px,
+ * which a 1 MB widget's one-line data string can be.
+ */
 @Composable
 fun CodeBlock(text: String) =
-    BasicText(text, Modifier.fillMaxWidth().background(Palette.surface).horizontalScroll(rememberScrollState()).keyScrolled().padding(6.dp), style = Mono.copy(fontSize = TextSize.Small))
+    BasicText(remember(text) { text.cutLongLines() }, Modifier.fillMaxWidth().background(Palette.surface).horizontalScroll(rememberScrollState()).keyScrolled().padding(6.dp), style = Mono.copy(fontSize = TextSize.Small))
+
+private const val MAX_CODE_LINE = 10_000
+
+private fun String.cutLongLines(): String =
+    if (lineSequence().none { it.length > MAX_CODE_LINE }) this else lineSequence().joinToString("\n") { if (it.length > MAX_CODE_LINE) it.take(MAX_CODE_LINE) + "…" else it }
 
 /**
  * A framed popup list at [position] with [selected] marked; picking one closes it first.

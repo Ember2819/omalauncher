@@ -65,11 +65,13 @@ class Modes(
     private val flashInfo by lazy { flash?.let { runCatching { cameras.getCameraCharacteristics(it) }.getOrNull() } }
 
     /** How many brightness levels the torch has: 1 where it can't be dimmed, as before Android 13. */
-    private val torchSteps: Int by lazy { (if (Build.VERSION.SDK_INT >= 33) flashInfo?.get(CameraCharacteristics.FLASH_INFO_STRENGTH_MAXIMUM_LEVEL) else null) ?: 1 }
+    private val torchSteps: Int by lazy {
+        (if (Build.VERSION.SDK_INT >= 33) runCatching { flashInfo?.get(CameraCharacteristics.FLASH_INFO_STRENGTH_MAXIMUM_LEVEL) }.getOrNull() else null) ?: 1
+    }
 
     /** The level it shines at unless told otherwise. */
     private val torchDefault: Int by lazy {
-        (if (Build.VERSION.SDK_INT >= 33) flashInfo?.get(CameraCharacteristics.FLASH_INFO_STRENGTH_DEFAULT_LEVEL) else null)?.takeIf { it in 1..torchSteps } ?: torchSteps
+        (if (Build.VERSION.SDK_INT >= 33) runCatching { flashInfo?.get(CameraCharacteristics.FLASH_INFO_STRENGTH_DEFAULT_LEVEL) }.getOrNull() else null)?.takeIf { it in 1..torchSteps } ?: torchSteps
     }
 
     private val dimmable get() = Build.VERSION.SDK_INT >= 33 && torchSteps > 1
