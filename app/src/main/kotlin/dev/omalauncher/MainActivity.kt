@@ -21,8 +21,8 @@ import androidx.compose.runtime.snapshotFlow
 import dev.omalauncher.ui.Palette
 import dev.omalauncher.theme.Style
 import dev.omalauncher.ui.KeyIndicated
-import dev.omalauncher.ui.arrowKeys
 import dev.omalauncher.ui.keysStartAgain
+import dev.omalauncher.ui.movesFocus
 import dev.omalauncher.ui.LauncherStyle
 import dev.omalauncher.ui.SystemBarsEffect
 import dev.omalauncher.ui.applySystemBars
@@ -156,9 +156,9 @@ class MainActivity : ComponentActivity() {
         if (event.isMetaPressed && event.action == KeyEvent.ACTION_DOWN && shortcut(event.keyCode)) return true
         if (event.keyCode != KeyEvent.KEYCODE_BACK && runtime.terminals.active != null && runtime.keyboard.handle(event)) return true
         // Nothing in the window has the keys (yet, or since a tap), so an arrow has nowhere to move from: it starts in the
-        // open panel, or at home's first tile.
-        if (event.keyCode in arrowKeys && event.action == KeyEvent.ACTION_DOWN && !state.keysFocused) {
-            if (keysStartAgain(window.decorView) || state.focusHome()) return true
+        // open panel, or at home's first tile. One a tap opened starts it too, though the keys are still behind it.
+        if (movesFocus(event.keyCode) && event.action == KeyEvent.ACTION_DOWN) {
+            if (keysStartAgain(window.decorView, state.keysFocused) || !state.keysFocused && state.focusHome()) return true
         }
         return super.dispatchKeyEvent(event) || escapeAsBack(event)
     }

@@ -117,6 +117,7 @@ import dev.omalauncher.ui.LauncherStyle
 import dev.omalauncher.ui.Palette
 import dev.omalauncher.ui.frame
 import dev.omalauncher.ui.drawKeyFocus
+import dev.omalauncher.ui.holdsKeys
 import dev.omalauncher.ui.keyActivated
 import dev.omalauncher.ui.TerminalView
 import dev.omalauncher.widgets.lang.Action
@@ -138,6 +139,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.util.WeakHashMap
 import kotlin.math.max
 import kotlin.math.min
 
@@ -977,8 +979,8 @@ private fun handlers(
     return m
 }
 
-/** The node keys reached last, which a Popup gives focus back to as it closes: the one that opened it. */
-private var keyFocused: FocusRequester? = null
+/** The node a key tapped last in each widget: a Popup it opens gives focus back to it as it closes. */
+private val keyOpeners = WeakHashMap<WidgetInstance, FocusRequester>()
 
 /**
  * Lets a keyboard or a gamepad reach a node that takes taps (see [keyActivated]), ringed in the accent color while it
@@ -996,8 +998,12 @@ private fun keyFocus(
     var focused by remember { mutableStateOf(false) }
     val bounds = remember { mutableStateOf(IntSize.Zero) }
     val requester = remember { FocusRequester() }
+    DisposableEffect(p.inst) { onDispose { keyOpeners.remove(p.inst, requester) } }
     val radius = p.float("radius", (if (p.has("border")) 8f else 4f) * LauncherStyle.cornerScale)
-    fun at(a: Action) = fire(a, bounds.value.width / 2f, bounds.value.height / 2f)
+    fun at(a: Action) {
+        keyOpeners[p.inst] = requester
+        fire(a, bounds.value.width / 2f, bounds.value.height / 2f)
+    }
     return Modifier
         .onSizeChanged { bounds.value = it }
         .focusRequester(requester)
@@ -1011,10 +1017,8 @@ private fun keyFocus(
                         at(it)
                     }
                 },
-        ) {
-            focused = it
-            if (it) keyFocused = requester
-        }.drawWithContent {
+        ) { focused = it.isFocused }
+        .drawWithContent {
             drawContent()
             if (focused) drawKeyFocus(radius())
         }
@@ -1174,9 +1178,9 @@ private fun PopupNode(
     val framed = p.has("background") || p.has("border")
     val opened = LocalMenuOpened.current
     LaunchedEffect(Unit) { opened() }
-    // Focus goes into the popup's window and doesn't come back by itself: closed, the node keys had is theirs again.
+    // Focus goes into the popup's window and doesn't come back by itself: closed, the node a key opened it from has it again.
     val view = LocalView.current
-    val opener = remember { keyFocused }
+    val opener = remember { keyOpeners.remove(inst) }
     DisposableEffect(Unit) { onDispose { opener?.let { view.post { it.requestFocus() } } } }
     Popup(
         popupPositionProvider = position,
@@ -1191,7 +1195,7 @@ private fun PopupNode(
                 else -> Alignment.Start
             }
         Column(
-            (if (framed) mod else Modifier.frame(2.dp, Palette.accent, Palette.background).then(mod).then(if (p.has("padding")) Modifier else Modifier.padding(4.dp))),
+            (if (framed) mod else Modifier.frame(2.dp, Palette.accent, Palette.background).then(mod).then(if (p.has("padding")) Modifier else Modifier.padding(4.dp))).holdsKeys(),
             verticalArrangement = Arrangement.spacedBy(gap),
             horizontalAlignment = align,
         ) { Nodes(el.children, env, inst, this) }

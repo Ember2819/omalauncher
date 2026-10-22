@@ -424,6 +424,7 @@ internal fun SearchField(
         keyboardActions = KeyboardActions(onGo = { onGo() }),
         modifier =
             modifier
+                .leavesUpDown()
                 .fillMaxWidth()
                 .clip(LauncherStyle.shape(24.dp))
                 .background(Palette.surface)
@@ -468,8 +469,10 @@ private fun AppActions(
             }
         }
     Popup(popupPositionProvider = position, onDismissRequest = onDismiss, properties = PopupProperties(focusable = true)) {
-        MenuItems(actions, onDismiss, minWidth = 160.dp, itemPadding = 12.dp, fontSize = TextSize.Item) {
-            if (menu != null) ShortcutRows(offered, menu, onDismiss, TextSize.Item)
+        Box(Modifier.holdsKeys()) {
+            MenuItems(actions, onDismiss, minWidth = 160.dp, itemPadding = 12.dp, fontSize = TextSize.Item) {
+                if (menu != null) ShortcutRows(offered, menu, onDismiss, TextSize.Item)
+            }
         }
     }
 }

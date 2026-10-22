@@ -61,6 +61,7 @@ import androidx.compose.foundation.focusGroup
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -386,8 +387,12 @@ fun HomeScreen(
                         is Folder -> { -> arrange.folder = item.key }
                     }
                 // Keys reach a tile as a finger does: Enter opens it, and Menu or holding Enter selects it, as a long press.
+                // What takes taps in a widget is inside it, Right away; Enter goes there too on one with no tap of its own.
+                // It shows as the tile's own focus.
                 var keyed by remember(item.key) { mutableStateOf(false) }
-                val tile = placed.keyActivated(open, { state.editing = item.key }) { keyed = it }
+                val inside = remember(item.key) { FocusRequester() }
+                val keyOpen: () -> Unit = if (item is WidgetItem && item.spec.program?.onTap == null) { { inside.requestFocus() } } else open
+                val tile = placed.keyActivated(keyOpen, { state.editing = item.key }, inside) { keyed = it.hasFocus }
                 val highlighted = selected || keyed
                 when (item) {
                     is WidgetItem -> {

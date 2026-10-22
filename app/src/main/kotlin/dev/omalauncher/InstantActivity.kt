@@ -19,8 +19,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import dev.omalauncher.ui.KeyIndicated
-import dev.omalauncher.ui.arrowKeys
 import dev.omalauncher.ui.keysStartAgain
+import dev.omalauncher.ui.movesFocus
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -50,11 +50,15 @@ abstract class InstantActivity : ComponentActivity() {
     }
 
     // Lint flags super.dispatchKeyEvent: ComponentActivity marks its override @RestrictTo, but Activity's is public API.
-    /** An arrow with nothing focused (as after a tap) starts in the screen's panel again; Esc that nothing took is Back. */
+    /**
+     * An arrow with nothing focused (as after a tap) starts in the screen's panel again, and so does typing, which then
+     * goes on to where it started, like the editor's text; Esc that nothing took is Back.
+     */
     @SuppressLint("RestrictedApi")
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        val start = event.keyCode in arrowKeys && event.action == KeyEvent.ACTION_DOWN && !keysFocused
-        if (start && keysStartAgain(window.decorView)) return true
+        val down = event.action == KeyEvent.ACTION_DOWN
+        if (down && movesFocus(event.keyCode) && keysStartAgain(window.decorView, keysFocused)) return true
+        if (down && event.isPrintingKey && !keysFocused) keysStartAgain(window.decorView, focused = false)
         return super.dispatchKeyEvent(event) || escapeAsBack(event)
     }
 

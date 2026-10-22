@@ -34,6 +34,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -79,7 +81,9 @@ internal fun SetupScreen(runtime: Runtime) {
             if (error == null) runtime.finishWelcome()
         }
     }
-    Column(Modifier.fillMaxSize().safeDrawingPadding(), horizontalAlignment = Alignment.CenterHorizontally) {
+    // Keys start on the picked theme: on the first, the strip would pick that one as focus lands on it.
+    val pickedFocus = remember { FocusRequester() }
+    Column(Modifier.fillMaxSize().safeDrawingPadding().holdsKeys(start = pickedFocus), horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
             contentAlignment = Alignment.TopCenter,
@@ -91,7 +95,7 @@ internal fun SetupScreen(runtime: Runtime) {
                 if (started) {
                     ThemeDownloadProgress(themes.choices.firstOrNull { it.name == themes.picked }?.title?.lowercase() ?: themes.picked, error, onRetry = ::fetchTheme, onSkip = runtime::finishWelcome)
                 } else {
-                    Welcome(themes, linux, { linux = !linux }, picked) { bin -> picked = if (bin in picked) picked - bin else picked + bin }
+                    Welcome(themes, pickedFocus, linux, { linux = !linux }, picked) { bin -> picked = if (bin in picked) picked - bin else picked + bin }
                 }
             }
         }
@@ -125,6 +129,7 @@ private fun Wordmark() {
 @Composable
 private fun Welcome(
     themes: ThemeStore,
+    pickedFocus: FocusRequester,
     linux: Boolean,
     onToggleLinux: () -> Unit,
     picked: List<String>,
@@ -153,7 +158,7 @@ private fun Welcome(
     }
     Appear(1) {
         // A key moving along the strip picks as it goes, as a tap does.
-        ThemeStrip(themes, pickOnFocus = true)
+        ThemeStrip(themes, pickOnFocus = true, pickedFocus = pickedFocus)
     }
     Spacer(Modifier.height(32.dp))
     Appear(2) {
@@ -458,6 +463,8 @@ internal fun ThemeStrip(
     onPick: (BundledTheme) -> Unit = themes::pick,
     onBrowse: (() -> Unit)? = null,
     pickOnFocus: Boolean = false,
+    /** Gives keys the picked theme's swatch. */
+    pickedFocus: FocusRequester? = null,
 ) {
     RescanThemes(themes)
     val list = themes.choices
@@ -480,7 +487,10 @@ internal fun ThemeStrip(
             contentPadding = PaddingValues(horizontal = gutter),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            items(list, key = { it.name }) { theme -> ThemeSwatch(theme, theme.name == themes.picked, pickOnFocus) { onPick(theme) } }
+            items(list, key = { it.name }) { theme ->
+                val selected = theme.name == themes.picked
+                ThemeSwatch(theme, selected, pickOnFocus, if (selected) pickedFocus else null) { onPick(theme) }
+            }
             if (onBrowse != null) item(key = "browse") { BrowseSwatch(onBrowse) }
         }
     }
@@ -492,6 +502,7 @@ private fun ThemeSwatch(
     theme: BundledTheme,
     selected: Boolean,
     pickOnFocus: Boolean,
+    focus: FocusRequester?,
     onClick: () -> Unit,
 ) {
     fun color(key: String) = hexColor(theme.colors[key]) ?: Color.Gray
@@ -500,6 +511,7 @@ private fun ThemeSwatch(
         Modifier
             .width(112.dp)
             .frame(if (selected) 2.dp else 1.dp, border, color("background"), radius = 12.dp)
+            .then(focus?.let { Modifier.focusRequester(it) } ?: Modifier)
             .onFocusChanged { if (pickOnFocus && it.isFocused && !selected) onClick() }
             .clickable(onClick = onClick)
             .padding(10.dp),

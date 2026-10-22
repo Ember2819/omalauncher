@@ -48,7 +48,10 @@ Every node also takes:
   `onLongPress` (with `x`, `y`, owl 10); on a tile, long-press belongs to the home screen, which uses it
   to move and resize tiles. With a keyboard or a gamepad, Tab and the arrows (the D-pad) move between the nodes that
   have `onTap` or `onLongPress`, ringed in `accent`; Enter, Space or A taps one at its middle, and holding it, or Menu
-  (a gamepad's Select), long-presses it. A Popup gives the keys back to the node they were on as it closes
+  (a gamepad's Select), long-presses it. What takes taps inside one that does, like a `[+]` in a tappable row or a
+  widget's buttons on its tile, is reached with Right from it, and Left from the first comes back out; Enter on a tile
+  whose widget has no `onTap` of its own goes inside too. Up and Down leave an `Input`. A Popup keeps the keys while
+  it's open and gives them back to the node a key opened it from as it closes
 - `animate prop: spring()` or `tween(300ms, "linear"/"in"/"out"/"ease")`, for `value`,
   `opacity`, `rotation`, `scale`, `color` or `background`, and `offset` (owl 13). For springs:
   `spring(damping, stiffness)`. While a node's own `onDrag` has the finger, its animated `offset` follows the finger

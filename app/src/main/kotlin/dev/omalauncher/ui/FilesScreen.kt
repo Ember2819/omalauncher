@@ -183,7 +183,7 @@ fun FilesScreen(
                             cursorBrush = SolidColor(Palette.accent),
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                             keyboardActions = KeyboardActions(onSearch = {}),
-                            modifier = Modifier.fillMaxWidth().focusRequester(focus),
+                            modifier = Modifier.fillMaxWidth().focusRequester(focus).leavesUpDown(),
                             decorationBox = { inner ->
                                 Box {
                                     if (q.isEmpty()) BasicText("filter this folder", style = Mono.copy(color = Palette.muted, fontSize = TextSize.Title))

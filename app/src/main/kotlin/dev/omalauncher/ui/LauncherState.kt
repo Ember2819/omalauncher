@@ -61,7 +61,7 @@ class LauncherState {
     val stripEntry = FocusRequester()
 
     /** Gives home's first tile the keys' focus while home shows, for an arrow with nothing focused to start from. Whether one took it. */
-    fun focusHome() = drawer.value == 0f && pulled == null && homeEntry.requestFocus()
+    fun focusHome() = drawer.value == 0f && pulled == null && !homeMenuOpen && homeEntry.requestFocus()
 
     /** How far the home pages are scrolled, 0 (first) to 1 (last); the background slides along. */
     var wallpaperOffset by mutableFloatStateOf(0.5f)

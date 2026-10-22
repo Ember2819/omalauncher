@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
@@ -237,11 +238,15 @@ fun <T> ChoicePopup(
     footer: @Composable ColumnScope.() -> Unit = {},
 ) {
     Popup(popupPositionProvider = position, onDismissRequest = onDismiss, properties = PopupProperties(focusable = true)) {
+        // Keys start on the one picked now; a list longer than the screen scrolls to follow them.
+        val selectedFocus = remember { FocusRequester() }
         Column(
             Modifier
                 .width(IntrinsicSize.Max)
                 .widthIn(min = minWidth)
                 .frame(2.dp, Palette.accent, Palette.background)
+                .holdsKeys(start = selectedFocus.takeIf { selected in options })
+                .verticalScroll(rememberScrollState())
                 .padding(4.dp),
         ) {
             for (option in options) {
@@ -249,6 +254,7 @@ fun <T> ChoicePopup(
                 Row(
                     Modifier
                         .fillMaxWidth()
+                        .then(if (current) Modifier.focusRequester(selectedFocus) else Modifier)
                         .clickable {
                             onDismiss()
                             onPick(option)

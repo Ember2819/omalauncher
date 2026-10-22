@@ -55,7 +55,8 @@ and Super+W (close) in Linux windows. On home, in the app drawer, panels and
 widgets, the arrows or Tab (a gamepad's D-pad) move between tiles and what
 takes taps, past the first or last tile to the next page; Enter (A) opens it
 and Menu or holding Enter long-presses it, which selects a home tile for
-editing. Up from the bar goes back to the tiles, or into the open drawer.
+editing. Right goes into a widget's own buttons, Left back out to its tile.
+Up from the bar goes back to the tiles, or into the open drawer.
 Esc (B) closes the drawer, a panel or a widget's screen, like Back.
 
 ## Building

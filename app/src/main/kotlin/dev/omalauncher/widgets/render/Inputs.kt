@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.sp
 import dev.omalauncher.ui.LauncherStyle
 import dev.omalauncher.ui.Palette
 import dev.omalauncher.ui.TileField
+import dev.omalauncher.ui.leavesUpDown
 import dev.omalauncher.widgets.lang.Null
 import dev.omalauncher.widgets.lang.Num
 import dev.omalauncher.widgets.lang.Str
@@ -187,6 +188,7 @@ internal fun InputNode(
         onValueChange = ::edit,
         modifier =
             (if (sized) mod else mod.fillMaxWidth())
+                .leavesUpDown()
                 .focusRequester(requester)
                 .onFocusChanged {
                     focused = it.isFocused

@@ -20,6 +20,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.first
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.geometry.CornerRadius
@@ -36,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.FocusState
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -44,14 +47,24 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalInputModeManager
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalWindowInfo
 
-/** What a focused node holds of a key on it: whether its press was seen here, and whether holding it long-pressed. */
+/**
+ * What a focused node holds of a key on it: whether its press was seen here, and whether holding it long-pressed. And
+ * whether keys' focus is on it ([self]) or on it or something inside it ([within]).
+ */
 private class KeyHold {
     var down = false
     var longed = false
+    var self = false
+    var within = false
 }
 
 /** Keys that tap a focused node: a gamepad's A comes as itself, or as the D-pad's center where nothing takes it. */
@@ -61,23 +74,34 @@ private val activateKeys = setOf(Key.Enter, Key.NumPadEnter, Key.DirectionCenter
  * Lets a keyboard or a gamepad reach something that takes taps: it takes focus once keys are in use (not while
  * touching, like Compose's clickable), so Tab and the arrows move to it. Enter, Space, A or the D-pad's center taps it
  * as the key lifts; holding one, or Menu (a gamepad's Select), long-presses it. [onFocus] follows its focus, to show it.
+ *
+ * What takes taps inside it, like a widget's buttons on a home tile, is reached with the arrow along the reading
+ * direction (Right, in English): Compose's arrows only move between neighbors, never into one. The arrow back from the
+ * first thing inside comes out to it again, and [inside] gives focus to what's inside, as Enter on a tile with no tap
+ * of its own does.
  */
 @Composable
 fun Modifier.keyActivated(
     onTap: (() -> Unit)?,
     onLongPress: (() -> Unit)?,
-    onFocus: (Boolean) -> Unit = {},
+    inside: FocusRequester = remember { FocusRequester() },
+    onFocus: (FocusState) -> Unit = {},
 ): Modifier {
     val inputMode = LocalInputModeManager.current
+    val focusManager = LocalFocusManager.current
+    val ltr = LocalLayoutDirection.current == LayoutDirection.Ltr
     val hold = remember { KeyHold() }
+    val self = remember { FocusRequester() }
     return this
         .focusProperties { canFocus = inputMode.inputMode == InputMode.Keyboard }
         .onFocusChanged {
             if (!it.isFocused) hold.down = false
-            onFocus(it.isFocused)
+            hold.self = it.isFocused
+            hold.within = it.hasFocus
+            onFocus(it)
         }.onKeyEvent { e ->
             when {
-                e.key in activateKeys ->
+                e.key in activateKeys && hold.self ->
                     when (e.type) {
                         KeyEventType.KeyDown -> {
                             if (e.nativeKeyEvent.repeatCount == 0) {
@@ -102,16 +126,29 @@ fun Modifier.keyActivated(
                     if (e.type == KeyEventType.KeyUp) onLongPress()
                     true
                 }
+                e.key == (if (ltr) Key.DirectionRight else Key.DirectionLeft) && hold.self ->
+                    e.type == KeyEventType.KeyDown && inside.requestFocus(if (ltr) FocusDirection.Right else FocusDirection.Left)
+                // Back past the first thing inside: here, rather than on to the neighbor beyond.
+                e.key == (if (ltr) Key.DirectionLeft else Key.DirectionRight) && hold.within && !hold.self -> {
+                    if (e.type == KeyEventType.KeyDown) {
+                        if (!focusManager.moveFocus(if (ltr) FocusDirection.Left else FocusDirection.Right) || !hold.within) self.requestFocus()
+                    }
+                    true
+                }
                 else -> false
             }
-        }.focusable()
+        }.focusRequester(self)
+        .focusable()
+        .focusRequester(inside)
+        .focusGroup()
 }
 
 /**
  * For something that covers home, like a panel: keys' focus goes into it as it appears, while keys are in use (a touch
  * shouldn't focus its text field, raising the keyboard), and stays in it, so the arrows can't reach what's behind.
  * It starts on [start] where that's there, like a panel's ✕, rather than on a text field that keeps the arrows. An
- * arrow with nothing focused in the window, as after a tap, starts there again ([keysStartAgain]).
+ * arrow with nothing focused in the window, as after a tap, starts there again ([keysStartAgain]), back where it was.
+ * When one over it closes, like a menu or a dialog, keys go back into the newest one left, where they were in it.
  *
  * The drawer only wants the last: it opens from the bar, which keeps focus to type in, and the bar is outside it, so
  * [enters] and [traps] are false there.
@@ -124,40 +161,91 @@ fun Modifier.holdsKeys(
 ): Modifier {
     val inputMode = LocalInputModeManager.current
     val view = LocalView.current
+    val window = LocalWindowInfo.current
     val entry = remember { FocusRequester() }
-    val holder = remember(view, start) { KeyHolder(view) { start?.requestFocus() == true || entry.requestFocus() } }
+    val holder = remember(view, start, traps) { KeyHolder(view, entry, start, traps) }
     DisposableEffect(holder) {
         holders += holder
-        onDispose { holders -= holder }
+        onDispose {
+            val newest = holders.lastOrNull() === holder
+            holders -= holder
+            // What's under it gets the keys back: a panel gone from the window leaves nothing focused, and a menu's
+            // or a dialog's own window gives focus back to none in particular.
+            val under = holders.lastOrNull()
+            if (newest && under != null && inputMode.inputMode == InputMode.Keyboard) under.view.post { under.enter() }
+        }
     }
     LaunchedEffect(holder) {
-        if (!enters || inputMode.inputMode != InputMode.Keyboard) return@LaunchedEffect
+        if (!enters) return@LaunchedEffect
+        // A new window, like a screen's or a dialog's, knows whether keys are in use once it has focus, and Compose then
+        // gives its first node focus by itself: going in after that, it starts where it should.
+        snapshotFlow { window.isWindowFocused }.first { it }
+        if (inputMode.inputMode != InputMode.Keyboard) return@LaunchedEffect
         // Content that isn't laid out yet takes it a frame later.
-        if (!holder.enter()) withFrameNanos {}.also { holder.enter() }
+        if (!holder.enter(first = true)) withFrameNanos {}.also { holder.enter(first = true) }
     }
     return focusRequester(entry)
-        // Only the keys' moves stay in: focus asked for elsewhere, like the next settings page, goes.
-        .then(if (traps) Modifier.focusProperties { onExit = { if (requestedFocusDirection in keyMoves) cancelFocusChange() } } else Modifier)
-        .focusGroup()
+        .onFocusChanged { holder.focused = it.hasFocus }
+        .focusProperties {
+            onExit = {
+                // Only the keys' moves stay in: focus asked for elsewhere, like the next settings page, goes.
+                if (traps && requestedFocusDirection in keyMoves) cancelFocusChange() else entry.saveFocusedChild()
+            }
+        }.focusGroup()
 }
 
-/** A [holdsKeys] showing in [view]'s window, and how keys go into it. */
+/** A [holdsKeys] showing in [view]'s window, and how keys go into it: back where they were, else at [start]. */
 private class KeyHolder(
     val view: View,
-    val enter: () -> Boolean,
-)
+    private val entry: FocusRequester,
+    private val start: FocusRequester?,
+    val traps: Boolean,
+) {
+    var focused = false
+
+    /** Whether keys are in it now. Not [first]: they stay where they are in it. */
+    fun enter(first: Boolean = false): Boolean = !first && focused || entry.restoreFocusedChild() || start?.requestFocus() == true || entry.requestFocus()
+}
 
 /** The [holdsKeys] showing, newest last. */
 private val holders = mutableListOf<KeyHolder>()
 
 /**
- * An arrow with nothing focused in [window] has nowhere to move from, as after a tap: it starts in the newest
- * [holdsKeys] there. Whether one took it.
+ * A key that moves focus, with nothing [focused] in [window], has nowhere to move from, as after a tap: it starts in
+ * the newest [holdsKeys] there. So does one with focus left behind one that keeps the keys, as when a tap opened it.
+ * Whether one took it.
  */
-fun keysStartAgain(window: View): Boolean = holders.lastOrNull { it.view.rootView === window.rootView }?.enter?.invoke() == true
+fun keysStartAgain(
+    window: View,
+    focused: Boolean,
+): Boolean {
+    val holder = holders.lastOrNull { it.view.rootView === window.rootView } ?: return false
+    return (!focused || holder.traps && !holder.focused) && holder.enter()
+}
+
+/** Whether [keyCode] moves keys' focus: the arrows, and Tab. */
+fun movesFocus(keyCode: Int) = keyCode in arrowKeys || keyCode == KeyEvent.KEYCODE_TAB
+
+/**
+ * For a one-line text field: Up and Down move keys' focus on, as Tab does, where there's something that way, rather
+ * than the cursor to the start or the end.
+ */
+@Composable
+fun Modifier.leavesUpDown(): Modifier {
+    val focusManager = LocalFocusManager.current
+    return onPreviewKeyEvent { e ->
+        val direction =
+            when (e.key) {
+                Key.DirectionUp -> FocusDirection.Up
+                Key.DirectionDown -> FocusDirection.Down
+                else -> return@onPreviewKeyEvent false
+            }
+        e.type == KeyEventType.KeyDown && focusManager.moveFocus(direction)
+    }
+}
 
 /** The arrows, which move keys' focus. */
-val arrowKeys = setOf(KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT)
+private val arrowKeys = setOf(KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT)
 
 private val keyMoves = setOf(FocusDirection.Up, FocusDirection.Down, FocusDirection.Left, FocusDirection.Right, FocusDirection.Next, FocusDirection.Previous)
 
