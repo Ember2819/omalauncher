@@ -83,6 +83,7 @@ import dev.omalauncher.widgets.runtime.Media
 import dev.omalauncher.widgets.runtime.Modes
 import dev.omalauncher.widgets.runtime.Notifications
 import dev.omalauncher.widgets.runtime.Services
+import dev.omalauncher.widgets.runtime.Sim
 import dev.omalauncher.widgets.runtime.Streams
 import dev.omalauncher.widgets.runtime.SystemPanels
 import dev.omalauncher.widgets.runtime.Volume
@@ -157,6 +158,7 @@ class WidgetServices(
     private val volume = Volume(context)
     private val alarm = Alarm(context)
     private val modes = Modes(context)
+    private val sim = Sim(context)
     private val panels = SystemPanels(context)
 
     /** Opens launcher screens ("style" or "themes", "agents", "drawer"); set by the UI. */
@@ -201,6 +203,7 @@ class WidgetServices(
             "volume" -> volume.value()
             "alarm" -> alarm.value()
             "modes" -> modes.value()
+            "sim" -> sim.value()
             "apps" -> apps()
             "agents" -> agents()
             "recent" -> recent()
@@ -216,6 +219,7 @@ class WidgetServices(
             "volume" -> volume.updates()
             "alarm" -> alarm.updates()
             "modes" -> modes.updates()
+            "sim" -> sim.updates()
             // Both read Compose state: the app list and its usage, the installed agents and the one picked.
             "apps" -> snapshotFlow { apps() }
             "agents" -> snapshotFlow { agents() }
@@ -600,6 +604,8 @@ class WidgetServices(
             "copy" -> copy(arg)
             "notify" -> notify(arg, args.getOrNull(1)?.takeIf { it != Null }?.toString())
             "torch" -> modes.torch(args[0])
+            // Notification access lets the launcher switch it; without it, the setting that grants it.
+            "dnd" -> if (!media.granted || !modes.dnd(args[0]) { panels.open("dnd") }) media.openAccessSettings()
             "share" -> share(arg)
             "haptic" -> view?.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
             "open" -> openApp(arg)

@@ -48,8 +48,9 @@ Every node also takes:
   `onLongPress` (with `x`, `y`, owl 10); on a tile, long-press belongs to the home screen, which uses it
   to move and resize tiles
 - `animate prop: spring()` or `tween(300ms, "linear"/"in"/"out"/"ease")`, for `value`,
-  `opacity`, `rotation`, `scale`, `color` or `background`. For springs:
-  `spring(damping, stiffness)`
+  `opacity`, `rotation`, `scale`, `color` or `background`, and `offset` (owl 13). For springs:
+  `spring(damping, stiffness)`. While a node's own `onDrag` has the finger, its animated `offset` follows the finger
+  as it is; let go, it eases to where `onDragEnd` puts it, so a row swiped too little springs back
 
 `opacity`, `rotation`, `scale`, `offset`, colors and the contents of Canvas and
 Shader apply at draw time. Changing them, even every frame, costs no layout.

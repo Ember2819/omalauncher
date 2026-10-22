@@ -79,7 +79,7 @@ internal fun PulledPanel(
             Modifier
                 .fillMaxSize()
                 .graphicsLayer { alpha = state.pull.value }
-                .background(Palette.panel)
+                .background(Palette.background.copy(alpha = inst.panelOpacity()))
                 .pullSwipe(state)
                 .safeDrawingPadding()
                 .graphicsLayer {

@@ -189,11 +189,13 @@ private fun DesktopScreen(
     }
 
     if (panelShown) {
+        // As much as the drawer's own opacity says.
+        val opacity = drawer?.let { runtime.widgets.panelInstance(it)?.second?.panelOpacity() } ?: 0.97f
         Box(
             Modifier
                 .fillMaxSize()
                 .graphicsLayer { alpha = state.drawer.value.coerceAtMost(1f) }
-                .background(Palette.panel)
+                .background(Palette.background.copy(alpha = opacity))
                 .clickable { state.close() }
                 .drawerSwipe(state),
         )

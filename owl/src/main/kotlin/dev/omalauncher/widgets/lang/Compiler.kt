@@ -491,7 +491,9 @@ class Compiler private constructor(
         triggers: List<Trigger>,
     ): Program {
         since(PANEL_FILE, 0)
-        body.props.firstOrNull { it.name != "enter" }?.let { fail("a panel only takes enter (what the prompt bar says Enter does); the launcher frames it, and gesture settings pick which swipe opens it", it.pos) }
+        body.props.firstOrNull { it.name != "enter" && it.name != "opacity" }?.let {
+            fail("a panel only takes enter (what the prompt bar says Enter does) and opacity (how much it covers home); the launcher frames it, and gesture settings pick which swipe opens it", it.pos)
+        }
         body.handlers.firstOrNull { it.name != "onSubmit" && it.name != "onKey" }?.let {
             fail("handlers go on the nodes inside a panel; only onSubmit (Enter in the prompt bar) and onKey (its arrow and Tab keys) go at its top", it.pos)
         }
@@ -506,6 +508,14 @@ class Compiler private constructor(
         val onKey = body.handlers.firstOrNull { it.name == "onKey" }?.let { since("onKey", it.pos); handler(it, root) }
         // Before the level check, which counts what it uses.
         val enter = body.props.firstOrNull { it.name == "enter" }?.let { ex(it.value, root) }
+        val opacity =
+            body.props.firstOrNull { it.name == "opacity" }?.let {
+                since(PANEL_OPACITY, it.pos)
+                val e = ex(it.value, root)
+                val n = e.const?.let { c -> (c as? Num)?.v ?: Double.NaN }
+                if (n != null && n !in 0.0..1.0) fail("a panel's opacity is from 0 (home shows through) to 1 (solid)", it.pos)
+                e
+            }
         checkLevel(level)
         return Program(
             name = ast.name ?: "panel",
@@ -516,6 +526,7 @@ class Compiler private constructor(
             onSubmit = onSubmit,
             onKey = onKey,
             enter = enter,
+            opacity = opacity,
             triggers = triggers,
             commands = commands.toList(),
             secretHosts = secretHosts.mapValues { it.value.sorted() },
@@ -1009,6 +1020,7 @@ class Compiler private constructor(
         val animations =
             body.animations.associate { a ->
                 if (a.name !in ANIMATABLE) fail("'${a.name}' can't animate (${ANIMATABLE.joinToString()})", a.pos)
+                if (a.name == "offset") since(ANIMATE_OFFSET, a.pos)
                 a.name to ex(a.value, scope)
             }
         since(n.type, n.pos)
@@ -1198,6 +1210,8 @@ class Compiler private constructor(
                 since(call.name, call.pos)
                 // notification(...) with one value or three is a word from owl 13, even when the word isn't written out.
                 if (call.name == "notification" && call.args.size != 2) since("notification(\"action\")", call.pos)
+                // A written-out brightness; one from a value, like a Slider's, can't be told from on and off here.
+                if (call.name == "torch" && (args[0].const is Num || (args[0].const as? Str)?.v?.toDoubleOrNull() != null)) since(TORCH_LEVEL, call.pos)
                 if (call.name == "volume" && call.args.size == 2) {
                     (args[1].const as? Str)?.v?.let { if (it !in VOLUME_STREAMS) fail("volume's stream is ${VOLUME_STREAMS.joinToString()}", call.args[1].pos) }
                     since(VOLUME_STREAM, call.pos)

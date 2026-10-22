@@ -358,6 +358,8 @@ class Program(
     val onKey: Action? = null,
     /** A panel's `enter`: what the prompt bar says Enter does while it's open, like "▸ open". */
     val enter: Ev? = null,
+    /** A panel's `opacity`: how much the backdrop the launcher draws behind it covers home, 0 to 1; null for the default. */
+    val opacity: Ev? = null,
     val onTap: Action? = null,
     val triggers: List<Trigger>,
     /** Shell commands this widget can run, known without running it; for reviewing shared widgets. */

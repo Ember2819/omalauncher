@@ -144,19 +144,6 @@ class StyleTest {
         assertEquals(Style.GLASS, decoded.style[Style.STATUS_BAR.opacity], 0.0)
     }
 
-    @Test fun panelsOpacity() {
-        // A file from before it: the drawer as it always was, near-opaque, whatever the widgets' glass is.
-        assertEquals(0.97, StyleFile.decode(Toml.parse("[widgets]\nopacity = 0.3\n")).style[Style.PANEL_OPACITY], 0.0)
-        val t = Toml.parse("[panels]\nopacity = 1\n")
-        val decoded = StyleFile.decode(t)
-        assertEquals(1.0, decoded.style[Style.PANEL_OPACITY], 0.0)
-        assertEquals(emptyList<String>(), decoded.problems)
-        assertEquals("version = 1\n\n[panels]\nopacity = 1\n", Toml.write(StyleFile.encode(t, decoded.style), ""))
-        val bad = StyleFile.decode(mapOf("panels.opacity" to -0.5), Style().with(Style.PANEL_OPACITY, 0.8))
-        assertEquals(0.8, bad.style[Style.PANEL_OPACITY], 0.0)
-        assertEquals(listOf("panels.opacity"), bad.problems.map { it.substringBefore(':') })
-    }
-
     @Test fun absentKeysAreDefaultsNotThePreviousValues() {
         val previous = Style().with(Style.GAPS_IN, 10.0)
         assertEquals(6.0, StyleFile.decode(emptyMap(), previous).style[Style.GAPS_IN], 0.0)

@@ -100,7 +100,8 @@ class Notifications(
     /**
      * "open" runs the notification's tap action and "dismiss" clears it; "clear" clears every one that can be, as the
      * shade's Clear all does. "action" presses the [arg]-th of its buttons, and "reply" sends [arg] as typed text through
-     * the one that takes it. Without access, opens the setting that grants it.
+     * the one that takes it. "snooze" hides it for [arg] seconds, after which Android shows it again; with a number for
+     * [key] and no [arg], every one that can be cleared. Without access, opens the setting that grants it.
      */
     fun control(
         command: String,
@@ -110,10 +111,17 @@ class Notifications(
         val listener = MediaListener.connected
         if (!media.granted || listener == null) return media.openAccessSettings()
         if (command == "clear") return listener.cancelAllNotifications()
+        // Without a key, every one that can be cleared, for "mute 1h": each comes back when its time is up.
+        if (command == "snooze" && arg == null) {
+            val ms = snoozeMs(key?.toDoubleOrNull()) ?: return
+            for (sbn in shown()) if (sbn.isClearable) runCatching { listener.snoozeNotification(sbn.key, ms) }
+            return
+        }
         val sbn = key?.let { runCatching { listener.getActiveNotifications(arrayOf(it)) }.getOrNull()?.firstOrNull() } ?: return
         when (command) {
             "open" -> if (send(sbn.notification.contentIntent)) autoCancel(listener, sbn)
             "dismiss" -> listener.cancelNotification(sbn.key)
+            "snooze" -> snoozeMs(arg?.num())?.let { if (sbn.isClearable) runCatching { listener.snoozeNotification(sbn.key, it) } }
             "action" -> {
                 val action = arg?.num()?.toInt()?.let { actions(sbn).getOrNull(it) } ?: return
                 // Pressed bare, a reply button would send the app no text: that's "reply".
@@ -131,6 +139,9 @@ class Notifications(
             }
         }
     }
+
+    /** A snooze of [seconds], from a minute to a week; null for none. */
+    private fun snoozeMs(seconds: Double?) = seconds?.takeIf { it > 0 }?.coerceIn(60.0, 7 * 24 * 3600.0)?.let { (it * 1000).toLong() }
 
     /** Sends one of a notification's intents from the launcher, in front; false if the app had cancelled it. */
     private fun send(

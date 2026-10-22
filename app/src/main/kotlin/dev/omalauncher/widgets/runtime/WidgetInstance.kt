@@ -930,6 +930,9 @@ class WidgetInstance(
     /** What a panel's `enter` says Enter does now; null without one, "" for nothing to say. */
     fun enterHint(): String? = program.enter?.let { eval(it, root, "enter").text() }
 
+    /** How much the backdrop behind a panel covers home, from its `opacity`: near-opaque without one, as home's widgets showing through make a drawer's icons hard to read. */
+    fun panelOpacity(): Float = program.opacity?.let { eval(it, root, "opacity").num()?.toFloat()?.coerceIn(0f, 1f) } ?: 0.97f
+
     /** Runs a panel's onSubmit with [text] as `value`; false when it has none, and Enter does what the bar does. */
     fun submit(text: String): Boolean {
         val action = program.onSubmit ?: return false

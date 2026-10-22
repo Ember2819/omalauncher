@@ -6,6 +6,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.WindowInsets
 import android.os.Build
+import android.os.SystemClock
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -47,10 +48,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.referentialEqualityPolicy
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -94,6 +97,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
@@ -361,6 +365,9 @@ private val SIZING = setOf("width", "height", "size", "fill", "weight")
 
 /** Lengths past this, in dp, are clamped: in a scrolling Column a bigger one can't be represented and fails the layout. */
 private const val MAX_DP = 4000.0
+
+/** A finger still this long, in ms, before it lifts lets go at rest: onDragEnd's vx and vy are 0. */
+private const val STOPPED_MS = 40L
 
 /** A padding in dp: Compose throws on a negative or NaN one. */
 private fun inset(n: Double) = (if (n >= 0) n.coerceAtMost(MAX_DP) else 0.0).dp
@@ -767,6 +774,8 @@ private fun common(
     parent: Any?,
 ): Modifier {
     var m: Modifier = Modifier
+    // While the node's own onDrag has the finger: an animated offset follows it rather than easing after it.
+    val held = remember { mutableStateOf(false) }
     p.observe("weight")?.num()?.toFloat()?.takeIf { it > 0f }?.let { w ->
         m =
             when (parent) {
@@ -784,10 +793,11 @@ private fun common(
     p.observe("width")?.num()?.let { m = m.width(it.coerceAtMost(MAX_DP).dp) }
     p.observe("height")?.num()?.let { m = m.height(it.coerceAtMost(MAX_DP).dp) }
     if (p.has("offset")) {
+        val offset = p.offset(held)
         m =
             m.offset {
-                val o = p.now("offset") as? Lst
-                IntOffset(((o?.items?.getOrNull(0)?.num() ?: 0.0) * density).toInt(), ((o?.items?.getOrNull(1)?.num() ?: 0.0) * density).toInt())
+                val o = offset()
+                IntOffset((o.x * density).toInt(), (o.y * density).toInt())
             }
     }
     val hasLayer = p.has("opacity") || p.has("rotation") || p.has("scale") || p.has("clip")
@@ -837,13 +847,16 @@ private fun common(
                 if (w > 0f) drawRoundRect(borderColor(), Offset(w / 2, w / 2), Size(size.width - w, size.height - w), r, style = Stroke(w))
             }
     }
-    m = m.then(handlers(p))
+    m = m.then(handlers(p, held))
     padding(p.observe("padding"))?.let { m = m.padding(it) }
     return m
 }
 
 @Composable
-private fun handlers(p: Props): Modifier {
+private fun handlers(
+    p: Props,
+    held: MutableState<Boolean>,
+): Modifier {
     val el = p.el
     if (el.handlers.isEmpty()) return Modifier
     val density = LocalDensity.current.density
@@ -883,7 +896,9 @@ private fun handlers(p: Props): Modifier {
                 // Where the drag has got to, from its moves: the node may move with the finger (offset: [dragX, 0]),
                 // so the finger's place on it says nothing about its speed.
                 var travelled = Offset.Zero
+                var lastMove = 0L
                 val start: (Offset) -> Unit = {
+                    held.value = true
                     velocity.resetTracking()
                     travelled = Offset.Zero
                 }
@@ -894,13 +909,19 @@ private fun handlers(p: Props): Modifier {
                 ) {
                     change.consume()
                     travelled += Offset(dx, dy)
+                    lastMove = change.uptimeMillis
                     velocity.addPosition(change.uptimeMillis, travelled)
                     fire(a, dx, dy, change.position.x, change.position.y)
                 }
                 // A cancelled drag (the node went, another gesture took over) ends at rest, so nothing reads it as a flick.
                 fun ended(cancelled: Boolean) {
-                    val v = velocity.calculateVelocity()
-                    end?.let { if (cancelled) fire(it, 0f, 0f) else fire(it, v.x, v.y) }
+                    // First, so what onDragEnd moves the node to animates there.
+                    held.value = false
+                    // A finger that stopped before it lifted lets go at rest, not at the speed it last moved: the tracker only
+                    // sees moves.
+                    val still = SystemClock.uptimeMillis() - lastMove > STOPPED_MS
+                    val v = if (cancelled || still) Velocity.Zero else velocity.calculateVelocity()
+                    end?.let { fire(it, v.x, v.y) }
                 }
                 when (axis) {
                     "horizontal" -> detectHorizontalDragGestures(start, { ended(false) }, { ended(true) }) { change, dx -> move(change, dx, 0f) }

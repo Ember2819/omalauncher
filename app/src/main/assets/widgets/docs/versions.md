@@ -27,4 +27,5 @@ file only this phone runs, `owl: 12` is fine; for the store, a lower level reach
 - **12**: `screenTop`, `gapsIn`, `gapsOut`, `borderWidth`, `keybar "…" { }` files, `pressKey`, `typeText`, `latch`, `android.modifiers`, `onPress`,
   `onRelease`, `repeats`, post's `method:`, `toBase64`, `fromBase64`, `secret` states and Input's `password`
 - **13**: `settings`, `notification("clear")`, `"action"` and `"reply"`, `volume`'s stream, `drag`, `onDragEnd`, `android.network`, `android.volume`'s
-  `output`, and in `android.modes` the radios, location, rotation, dark theme and brightness
+  `output`, a panel's `opacity`, `android.sim`, `dnd`, `torch(level)`,
+  `notification("snooze")`, `animate offset`, and in `android.modes` the radios, location, rotation, dark theme, brightness, `dndLevel` and `torchLevel`
