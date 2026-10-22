@@ -152,10 +152,13 @@ fun ShareWidgetScreen(
                             }
                         }
                     }
+                    val sendable = link.length <= MAX_SENT_LINK
                     BasicText(
                         when {
-                            code == null -> "Or send the link: permanent, the whole widget is in it."
-                            pasted != null -> "Links to ${Paste.HOST}, gone in ${Paste.DAYS} days. The link below is permanent."
+                            code == null && sendable -> "Or send the link: permanent, the whole widget is in it."
+                            code == null -> "Too big to send as a link: the QR code is the way to share it."
+                            pasted != null && sendable -> "Links to ${Paste.HOST}, gone in ${Paste.DAYS} days. The link below is permanent."
+                            pasted != null -> "Links to ${Paste.HOST}, gone in ${Paste.DAYS} days."
                             else -> "Permanent: the whole widget is in the image."
                         },
                         style = Mono.copy(color = Palette.muted, fontSize = TextSize.Small),
@@ -178,16 +181,16 @@ fun ShareWidgetScreen(
                                 }
                             }
                         }
-                        BracketAction("share link", Palette.accent) {
+                        if (sendable) BracketAction("share link", Palette.accent) {
                             val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, link).putExtra(Intent.EXTRA_SUBJECT, "$name widget")
                             context.startActivity(Intent.createChooser(send, "Share $name").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                         }
-                        BracketAction(if (copied) "copied" else "copy link", Palette.foreground) {
+                        if (sendable) BracketAction(if (copied) "copied" else "copy link", Palette.foreground) {
                             context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("$name widget", link))
                             copied = true
                         }
                     }
-                    BasicText(
+                    if (sendable) BasicText(
                         "Omarchy: omarchy-widgets import '<link>'",
                         style = Mono.copy(color = Palette.muted, fontSize = TextSize.Small),
                     )
@@ -208,6 +211,12 @@ fun ShareWidgetScreen(
         }
     }
 }
+
+/**
+ * The longest whole-widget link the share sheet and the clipboard get: both go through a binder transaction, which
+ * fails past about 1 MB (two bytes a character), and a widget near [Review.MAX_BYTES] makes a link of ~400K.
+ */
+private const val MAX_SENT_LINK = 100_000
 
 /** What the share screen shows, worked out off the main thread; nulls past the first that can't be had. */
 private class Prepared(
