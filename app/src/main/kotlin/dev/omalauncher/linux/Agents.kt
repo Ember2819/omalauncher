@@ -61,6 +61,21 @@ val AGENTS =
  */
 const val MISE_SELF_UPDATE = "{ mise self-update -y || true; }"
 
+/**
+ * Downloads and caches are only needed during installs and upgrades; storage on phones is tight. npm-backed
+ * agents leave npm's cache behind too (125 MB after one update).
+ */
+/**
+ * `mise prune -y`, but deleting the unused versions itself first: under proot, mise can't delete a version
+ * with a hard link in it (OpenCode's npm postinstall makes one), stops at "Directory not empty", and leaves
+ * 255 MB behind. `mise ls --prunable` keeps versions a running program started from, like prune does.
+ */
+const val MISE_PRUNE =
+    "{ mise ls --prunable --json | sed -n 's/.*\"install_path\": \"\\([^\"]*\\)\".*/\\1/p' | " +
+        "while read -r p; do case \"\$p\" in */mise/installs/*) rm -rf \"\$p\" ;; esac; done; mise prune -y; }"
+
+const val MISE_CLEANUP = "mise cache clear && rm -rf ~/.local/share/mise/downloads ~/.npm/_cacache"
+
 /** Adds node to the global config when an installed agent needs it but was installed before it did (OpenCode 1). */
 val MISE_NODE_FOR_AGENTS =
     AGENTS.filter { it.node }.joinToString(" ", prefix = "if [ -z \"\$(mise ls -g node)\" ] && [ -n \"\$(mise ls -g ", postfix = ")\" ]; then mise use -g node@lts; fi") {
@@ -145,9 +160,7 @@ class AgentStore(
         buildString {
             append(if (mise.exists()) "$MISE_SELF_UPDATE && " else "curl -fsSL https://mise.run | sh && ")
             if (agent.node) append("mise use -g node@lts && ")
-            append("mise use -g ${shellQuote(agent.pkg)}")
-            // Downloads are only needed during install; storage on phones is tight.
-            append(" && mise cache clear && rm -rf ~/.local/share/mise/downloads")
+            append("mise use -g ${shellQuote(agent.pkg)} && $MISE_CLEANUP")
         }
 
     /** Call after [installScript] succeeded: makes the agent show up in the drawer. */
@@ -157,7 +170,7 @@ class AgentStore(
     }
 
     suspend fun remove(agent: Agent) =
-        run(agent, "removing") { "mise unuse -g ${shellQuote(agent.pkg)} && mise prune -y" }
+        run(agent, "removing") { "mise unuse -g ${shellQuote(agent.pkg)} && $MISE_PRUNE" }
             .also {
                 refresh()
                 onChanged()
