@@ -64,10 +64,6 @@ import androidx.compose.runtime.structuralEqualityPolicy
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -122,7 +118,6 @@ import dev.omalauncher.ui.NerdSymbols
 import dev.omalauncher.ui.LauncherStyle
 import dev.omalauncher.ui.Palette
 import dev.omalauncher.ui.frame
-import dev.omalauncher.ui.drawKeyFocus
 import dev.omalauncher.ui.holdsKeys
 import dev.omalauncher.ui.keyActivated
 import dev.omalauncher.ui.TerminalView
@@ -145,7 +140,6 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import java.util.WeakHashMap
 import kotlin.math.max
 import kotlin.math.min
 
@@ -1031,9 +1025,6 @@ private fun keyPressed(
         }.then(keyFocus(p, null, null) { _, _, _ -> })
 }
 
-/** The node a key tapped last in each widget: a Popup it opens gives focus back to it as it closes. */
-private val keyOpeners = WeakHashMap<WidgetInstance, FocusRequester>()
-
 /**
  * Lets a keyboard or a gamepad reach a node that takes taps (see [keyActivated]), ringed in the accent color while it
  * has focus. A key taps it at its middle.
@@ -1047,18 +1038,11 @@ private fun keyFocus(
 ): Modifier {
     val haptics = LocalHapticFeedback.current
     val claim = LocalLongPressClaim.current
-    var focused by remember { mutableStateOf(false) }
     val bounds = remember { mutableStateOf(IntSize.Zero) }
-    val requester = remember { FocusRequester() }
-    DisposableEffect(p.inst) { onDispose { keyOpeners.remove(p.inst, requester) } }
     val radius = p.float("radius", (if (p.has("border")) 8f else 4f) * LauncherStyle.cornerScale)
-    fun at(a: Action) {
-        keyOpeners[p.inst] = requester
-        fire(a, bounds.value.width / 2f, bounds.value.height / 2f)
-    }
+    fun at(a: Action) = fire(a, bounds.value.width / 2f, bounds.value.height / 2f)
     return Modifier
         .onSizeChanged { bounds.value = it }
-        .focusRequester(requester)
         .keyActivated(
             onTap = tap?.let { { at(it) } },
             onLongPress =
@@ -1069,11 +1053,9 @@ private fun keyFocus(
                         at(it)
                     }
                 },
-        ) { focused = it.isFocused }
-        .drawWithContent {
-            drawContent()
-            if (focused) drawKeyFocus(radius())
-        }
+            ring = true,
+            radius = radius,
+        )
 }
 
 /**
@@ -1230,10 +1212,6 @@ private fun PopupNode(
     val framed = p.has("background") || p.has("border")
     val opened = LocalMenuOpened.current
     LaunchedEffect(Unit) { opened() }
-    // Focus goes into the popup's window and doesn't come back by itself: closed, the node a key opened it from has it again.
-    val view = LocalView.current
-    val opener = remember { keyOpeners.remove(inst) }
-    DisposableEffect(Unit) { onDispose { opener?.let { view.post { it.requestFocus() } } } }
     Popup(
         popupPositionProvider = position,
         onDismissRequest = { el.handlers["onDismiss"]?.run(env, emptyList()) },

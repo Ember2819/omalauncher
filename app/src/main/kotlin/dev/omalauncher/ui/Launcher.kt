@@ -39,7 +39,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.foundation.focusGroup
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.FilterQuality
@@ -79,7 +78,6 @@ fun LauncherRoot(
         Modifier
             .fillMaxSize()
             .then(if (showOwnBackground) Modifier.background(Palette.background) else Modifier)
-            .onFocusChanged { state.keysFocused = it.hasFocus }
             .keysRoot(),
     ) {
         if (ready) DesktopScreen(runtime, state) else SetupScreen(runtime)

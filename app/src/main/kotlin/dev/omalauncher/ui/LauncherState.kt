@@ -51,9 +51,6 @@ class LauncherState {
     /** Key of the home tile in edit mode (handles and action bar shown), if any. */
     var editing by mutableStateOf<String?>(null)
 
-    /** Whether anything in the launcher's window has the keys' focus: a tile, the bar, an app in the drawer. */
-    var keysFocused = false
-
     /** Home's pages, as keys enter them: requesting focus here gives it to the shown page's first tile. */
     val homeEntry = FocusRequester()
 

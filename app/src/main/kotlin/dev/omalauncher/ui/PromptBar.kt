@@ -41,7 +41,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.FocusDirection
@@ -394,16 +393,11 @@ private fun MicButton(
     val hold by rememberUpdatedState(onHold)
     val release by rememberUpdatedState(onRelease)
     val cancel by rememberUpdatedState(onCancel)
-    var keyed by remember { mutableStateOf(false) }
     Box(
         Modifier
             .size(PromptBarHeight)
             .background(if (listening) Palette.red else Color.Transparent)
-            .keyActivated({ tap() }, null) { keyed = it.isFocused }
-            .drawWithContent {
-                drawContent()
-                if (keyed) drawKeyFocus()
-            }
+            .keyActivated({ tap() }, null, ring = true)
             .pointerInput(Unit) {
                 val slop = 64.dp.toPx()
                 awaitEachGesture {

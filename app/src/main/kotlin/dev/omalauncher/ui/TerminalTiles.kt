@@ -28,7 +28,6 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.pointer.pointerInput
@@ -312,12 +311,14 @@ fun TerminalView(
             onRelease = { it.window = null },
             modifier = Modifier.fillMaxSize(),
         )
+        // Keys reach the terminal inside its tile (Enter on the tile, or Right): Enter there types into it, as a tap
+        // does, or restarts it once it has exited.
         when {
             window == null ->
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .keyTapped { term.start() }
+                        .keyActivated({ term.start() }, null, ring = true)
                         .pointerInput(term) { detectTapGestures { term.start() } },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -343,25 +344,13 @@ fun TerminalView(
                     Modifier
                         .fillMaxSize()
                         .focusRequester(back)
-                        .keyTapped {
+                        .keyActivated({
                             keysIn = true
                             tiles.activate(term)
-                        }.pointerInput(term) { detectTapGestures { tiles.activate(term) } },
+                        }, null, ring = true)
+                        .pointerInput(term) { detectTapGestures { tiles.activate(term) } },
                 )
         }
-    }
-}
-
-/**
- * Keys reach the terminal inside its tile (Enter on the tile, or Right), ringed: Enter there types into it, as a tap
- * does, or restarts it once it has exited.
- */
-@Composable
-private fun Modifier.keyTapped(onTap: () -> Unit): Modifier {
-    var focused by remember { mutableStateOf(false) }
-    return keyActivated(onTap, null) { focused = it.isFocused }.drawWithContent {
-        drawContent()
-        if (focused) drawKeyFocus()
     }
 }
 
