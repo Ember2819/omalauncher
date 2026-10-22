@@ -166,9 +166,10 @@ class KeyboardSink(
     /** Whether the soft keyboard is wanted: shown by us and not hidden by us since. */
     val wanted get() = softKeyboard
 
+    // Focusable only while it has the keyboard: one that always is takes the window's focus on its own, and the keys'
+    // arrows then never reach home's tiles.
     init {
-        isFocusable = true
-        isFocusableInTouchMode = true
+        isFocusable = false
     }
 
     /** Whether the field was last offered as plain text, for a Chinese, Japanese or Korean keyboard. */
@@ -272,6 +273,8 @@ class KeyboardSink(
     fun show() {
         val imm = imm()
         softKeyboard = true
+        isFocusable = true
+        isFocusableInTouchMode = true
         requestFocus()
         imm.restartInput(this)
         imm.showSoftInput(this, InputMethodManager.SHOW_IMPLICIT)
@@ -284,6 +287,8 @@ class KeyboardSink(
         softKeyboard = false
         bridge.clearLatches()
         imm.restartInput(this)
+        clearFocus()
+        isFocusable = false
     }
 }
 

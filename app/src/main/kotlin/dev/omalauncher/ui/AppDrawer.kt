@@ -29,6 +29,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
@@ -251,6 +253,8 @@ internal fun RecentStrip(
     handlers: AppHandlers,
     modifier: Modifier = Modifier,
     vertical: Boolean = false,
+    /** Where Up goes from its apps; on each, as the list's own focus group keeps it from reaching them from outside. */
+    up: FocusRequester? = null,
 ) {
     val apps = recentApps(runtime, 20)
     // Nothing opened yet: no strip, but its room stays, so home doesn't shift when the first app shows up.
@@ -271,7 +275,9 @@ internal fun RecentStrip(
         val cells: LazyListScope.() -> Unit = {
             items(apps, key = { it.key }) { hit ->
                 val (icon, mask) = hit.icons(runtime)
-                StripCell(hit.label, icon, mask, onClick = { handlers.launch(hit) }, actions = { hit.actions(handlers) }, shortcuts = { hit.shortcutMenu(handlers) }, spoken = hit.spoken, paused = hit.paused(runtime))
+                Box(if (up != null) Modifier.focusProperties { this.up = up } else Modifier) {
+                    StripCell(hit.label, icon, mask, onClick = { handlers.launch(hit) }, actions = { hit.actions(handlers) }, shortcuts = { hit.shortcutMenu(handlers) }, spoken = hit.spoken, paused = hit.paused(runtime))
+                }
             }
         }
         if (vertical) {

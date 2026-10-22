@@ -30,6 +30,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -39,6 +40,9 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.style.TextOverflow
@@ -64,10 +68,13 @@ fun OverlayPanel(
     onBack: (() -> Unit)? = LocalPanelBack.current,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val close = remember { FocusRequester() }
     Box(
         Modifier
             .fillMaxSize()
             .background(Palette.overlay)
+            // A tap on the scrim closes the panel; keys move between what's in it, not to the scrim.
+            .focusProperties { canFocus = false }
             .clickable(onClick = onDismiss)
             .safeDrawingPadding()
             .padding(PanelGap),
@@ -75,7 +82,8 @@ fun OverlayPanel(
         PanelFrame(
             onClose = onDismiss.takeIf { onBack == null },
             // Taps inside the panel don't reach the scrim behind it.
-            modifier = Modifier.pointerInput(Unit) { detectTapGestures { } },
+            modifier = Modifier.pointerInput(Unit) { detectTapGestures { } }.holdsKeys(start = close),
+            closeFocus = close,
             title = { BackTitle(title, onBack) },
             actions = {
                 actions()
@@ -101,6 +109,8 @@ fun PanelFrame(
     /** The ✕; null for a window Android closes (Back, Recents), like an owl app's. */
     onClose: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    /** Gives keys the ✕, where a panel's keys start. */
+    closeFocus: FocusRequester? = null,
     title: @Composable () -> Unit,
     actions: @Composable RowScope.() -> Unit = {},
     contentWidth: Dp = Dp.Unspecified,
@@ -115,7 +125,10 @@ fun PanelFrame(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.weight(1f)) { title() }
             actions()
-            if (onClose != null) Symbol(Glyph.Close, Palette.red, Modifier.clickable(onClick = onClose).padding(8.dp), TextSize.Title)
+            if (onClose != null) {
+                val focus = closeFocus?.let { Modifier.focusRequester(it) } ?: Modifier
+                Symbol(Glyph.Close, Palette.red, focus.clickable(onClick = onClose).padding(8.dp), TextSize.Title)
+            }
         }
         Spacer(Modifier.height(8.dp))
         if (contentWidth == Dp.Unspecified) {

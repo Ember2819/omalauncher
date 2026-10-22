@@ -43,6 +43,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -54,6 +56,7 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onInterceptKeyBeforeSoftKeyboard
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
@@ -233,6 +236,9 @@ internal fun PromptBar(
     Column(
         modifier
             .fillMaxWidth()
+            // Up from the bar goes to the recent apps, or with none to home's tiles: Compose's own search passes over those,
+            // as the pages span the whole screen, under the bar too, so they aren't above it. In the drawer, to its apps.
+            .focusProperties { if (!panelShown && !(LauncherStyle.recentApps && recentApps(runtime, 1).isNotEmpty())) up = state.homeEntry }
             .pointerInput(Unit) {
                 detectTapGestures {
                     focus.requestFocus()
@@ -286,12 +292,24 @@ internal fun PromptBar(
                                 // Tapped (or Super+A): the panel opens. Mid-swipe it's already showing.
                                 if (it.isFocused && !panelShown) state.open()
                             }
-                            // A hardware Enter submits; Shift+Enter starts a new line. Tab and the arrows go to the drawer, to move its highlight.
+                            // Esc closes the drawer, as Omarchy's launcher does, before the soft keyboard can keep it to itself.
+                            .onInterceptKeyBeforeSoftKeyboard { e ->
+                                if (e.key != Key.Escape || !panelShown) return@onInterceptKeyBeforeSoftKeyboard false
+                                if (e.type == KeyEventType.KeyUp) {
+                                    focusManager.clearFocus()
+                                    state.close()
+                                }
+                                true
+                            }
+                            // A hardware Enter submits; Shift+Enter starts a new line. Tab and the arrows go to the drawer, to move its highlight;
+                            // with nothing typed there's none, and Tab or Up moves on into the panel, to what takes taps there.
                             .onPreviewKeyEvent { e ->
                                 if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                                 val oneLine = '\n' !in text
                                 when {
                                     e.key == Key.Enter && !e.isShiftPressed -> submit()
+                                    text.isEmpty() && panelShown && (e.key == Key.Tab || e.key == Key.DirectionUp) ->
+                                        focusManager.moveFocus(if (e.key == Key.Tab) FocusDirection.Previous else FocusDirection.Up)
                                     e.key == Key.Tab -> return@onPreviewKeyEvent drawerKey(if (e.isShiftPressed) "shift-tab" else "tab")
                                     e.key == Key.DirectionUp && oneLine -> return@onPreviewKeyEvent drawerKey("up")
                                     e.key == Key.DirectionDown && oneLine -> return@onPreviewKeyEvent drawerKey("down")

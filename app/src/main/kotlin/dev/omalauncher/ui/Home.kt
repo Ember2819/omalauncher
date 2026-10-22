@@ -57,6 +57,10 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.foundation.focusGroup
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -332,7 +336,14 @@ fun HomeScreen(
             itemsOn = engine::itemsOn,
             layout = engine.layout,
             arrange = arrange,
-            modifier = Modifier.weight(1f).fillMaxWidth(),
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    // Down out of the tiles stops at the recent apps first, which Compose's own search passes over.
+                    .focusProperties { onExit = { if (requestedFocusDirection == FocusDirection.Down) state.stripEntry.requestFocus() } }
+                    .focusRequester(state.homeEntry)
+                    .focusGroup(),
             selected = state.editing,
             onSelect = { state.editing = it },
             actions = { item ->
@@ -363,7 +374,21 @@ fun HomeScreen(
                     }
                 }
             },
-            render = { item, tile, highlighted ->
+            render = { item, placed, selected ->
+                val open: () -> Unit =
+                    when (item) {
+                        is WidgetItem -> { -> engine.tap(item.spec) }
+                        // Opening an app from a folder closes the folder, like Android.
+                        is Shortcut -> { ->
+                            arrange.folder = null
+                            runtime.open(item)
+                        }
+                        is Folder -> { -> arrange.folder = item.key }
+                    }
+                // Keys reach a tile as a finger does: Enter opens it, and Menu or holding Enter selects it, as a long press.
+                var keyed by remember(item.key) { mutableStateOf(false) }
+                val tile = placed.keyActivated(open, { state.editing = item.key }) { keyed = it }
+                val highlighted = selected || keyed
                 when (item) {
                     is WidgetItem -> {
                         // Whose terminal has the keyboard: the tile gives up what the keyboard covers once the lift is spent.
@@ -388,7 +413,7 @@ fun HomeScreen(
                                 } else {
                                     tile
                                 },
-                            onTap = { engine.tap(item.spec) },
+                            onTap = open,
                             needs = engine.missing[item.spec.file.name].orEmpty(),
                             install = engine.installs[item.spec.file.name],
                             onInstall = { engine.installDependencies(item.spec) },
@@ -404,11 +429,7 @@ fun HomeScreen(
                             icon = runtime.shortcutIcon(item, LauncherStyle.monochromeIcons),
                             focused = highlighted,
                             modifier = tile,
-                            onTap = {
-                                // Opening an app from a folder closes the folder, like Android.
-                                arrange.folder = null
-                                runtime.open(item)
-                            },
+                            onTap = open,
                             paused = runtime.androidApps.paused(item.profile),
                             clone = runtime.androidApps.cloned(item.profile),
                         )
@@ -419,7 +440,7 @@ fun HomeScreen(
                             labels = item.apps.take(4).map { runtime.shortcutLabel(it) },
                             focused = highlighted,
                             modifier = tile,
-                            onTap = { arrange.folder = item.key },
+                            onTap = open,
                         )
                 }
             },

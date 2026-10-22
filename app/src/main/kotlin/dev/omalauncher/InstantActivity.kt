@@ -1,5 +1,6 @@
 package dev.omalauncher
 
+import android.annotation.SuppressLint
 import android.app.ActivityManager
 import android.app.ActivityOptions
 import android.content.Context
@@ -10,9 +11,16 @@ import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.Icon
 import android.os.Build
+import android.view.KeyEvent
 import android.window.SplashScreen
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
+import dev.omalauncher.ui.KeyIndicated
+import dev.omalauncher.ui.arrowKeys
+import dev.omalauncher.ui.keysStartAgain
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -31,9 +39,23 @@ abstract class InstantActivity : ComponentActivity() {
     private var leaving = false
     private var background: Drawable? = null
 
+    /** Whether anything in the window has the keys' focus. */
+    private var keysFocused = false
+
     /** Like setContent, but drawing nothing while the window leaves. */
     protected fun setInstantContent(content: @Composable () -> Unit) {
-        setContent { if (!hidden) content() }
+        setContent {
+            if (!hidden) KeyIndicated { Box(Modifier.onFocusChanged { keysFocused = it.hasFocus }) { content() } }
+        }
+    }
+
+    // Lint flags super.dispatchKeyEvent: ComponentActivity marks its override @RestrictTo, but Activity's is public API.
+    /** An arrow with nothing focused (as after a tap) starts in the screen's panel again; Esc that nothing took is Back. */
+    @SuppressLint("RestrictedApi")
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val start = event.keyCode in arrowKeys && event.action == KeyEvent.ACTION_DOWN && !keysFocused
+        if (start && keysStartAgain(window.decorView)) return true
+        return super.dispatchKeyEvent(event) || escapeAsBack(event)
     }
 
     /** Closes the task, without the slide Android gives a closing task. */
@@ -104,4 +126,14 @@ abstract class InstantActivity : ComponentActivity() {
             context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION), options)
         }
     }
+}
+
+/**
+ * Esc that nothing else took is Back, as on a desktop: it closes what's open. Android leaves it unhandled. Shift doesn't
+ * matter (the emulator's keyboard can report it held); Ctrl, Alt or Super make it another shortcut.
+ */
+internal fun ComponentActivity.escapeAsBack(event: KeyEvent): Boolean {
+    if (event.keyCode != KeyEvent.KEYCODE_ESCAPE || event.isCtrlPressed || event.isAltPressed || event.isMetaPressed) return false
+    if (event.action == KeyEvent.ACTION_UP) onBackPressedDispatcher.onBackPressed()
+    return true
 }

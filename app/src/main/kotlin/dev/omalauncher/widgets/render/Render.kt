@@ -52,6 +52,7 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.referentialEqualityPolicy
@@ -63,6 +64,10 @@ import androidx.compose.runtime.structuralEqualityPolicy
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -111,6 +116,8 @@ import dev.omalauncher.ui.NerdSymbols
 import dev.omalauncher.ui.LauncherStyle
 import dev.omalauncher.ui.Palette
 import dev.omalauncher.ui.frame
+import dev.omalauncher.ui.drawKeyFocus
+import dev.omalauncher.ui.keyActivated
 import dev.omalauncher.ui.TerminalView
 import dev.omalauncher.widgets.lang.Action
 import dev.omalauncher.widgets.lang.Builtins
@@ -884,7 +891,7 @@ private fun handlers(
                         },
                     onTap = tap?.let { a -> { o -> fire(a, o.x, o.y) } },
                 )
-            }
+            }.then(keyFocus(p, tap, long) { a, x, y -> fire(a, x, y) })
     }
     el.handlers["onDrag"]?.let { a ->
         val end = el.handlers["onDragEnd"]
@@ -968,6 +975,49 @@ private fun handlers(
             }
     }
     return m
+}
+
+/** The node keys reached last, which a Popup gives focus back to as it closes: the one that opened it. */
+private var keyFocused: FocusRequester? = null
+
+/**
+ * Lets a keyboard or a gamepad reach a node that takes taps (see [keyActivated]), ringed in the accent color while it
+ * has focus. A key taps it at its middle.
+ */
+@Composable
+private fun keyFocus(
+    p: Props,
+    tap: Action?,
+    long: Action?,
+    fire: (Action, Float, Float) -> Unit,
+): Modifier {
+    val haptics = LocalHapticFeedback.current
+    val claim = LocalLongPressClaim.current
+    var focused by remember { mutableStateOf(false) }
+    val bounds = remember { mutableStateOf(IntSize.Zero) }
+    val requester = remember { FocusRequester() }
+    val radius = p.float("radius", (if (p.has("border")) 8f else 4f) * LauncherStyle.cornerScale)
+    fun at(a: Action) = fire(a, bounds.value.width / 2f, bounds.value.height / 2f)
+    return Modifier
+        .onSizeChanged { bounds.value = it }
+        .focusRequester(requester)
+        .keyActivated(
+            onTap = tap?.let { { at(it) } },
+            onLongPress =
+                long?.let {
+                    {
+                        claim?.claim()
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        at(it)
+                    }
+                },
+        ) {
+            focused = it
+            if (it) keyFocused = requester
+        }.drawWithContent {
+            drawContent()
+            if (focused) drawKeyFocus(radius())
+        }
 }
 
 /**
@@ -1124,6 +1174,10 @@ private fun PopupNode(
     val framed = p.has("background") || p.has("border")
     val opened = LocalMenuOpened.current
     LaunchedEffect(Unit) { opened() }
+    // Focus goes into the popup's window and doesn't come back by itself: closed, the node keys had is theirs again.
+    val view = LocalView.current
+    val opener = remember { keyFocused }
+    DisposableEffect(Unit) { onDispose { opener?.let { view.post { it.requestFocus() } } } }
     Popup(
         popupPositionProvider = position,
         onDismissRequest = { el.handlers["onDismiss"]?.run(env, emptyList()) },

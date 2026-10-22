@@ -769,7 +769,13 @@ private fun NumberSlider(
             Modifier
                 .weight(1f)
                 .height(40.dp)
-                .pointerInput(setting) { detectTapGestures { set(it.x, size.width) } }
+                // Keys step it, a twentieth of its range or with Shift a hundredth.
+                .keyStepped(vertical = false) { by, fine ->
+                    val span = range.endInclusive - range.start
+                    val v = Math.round((value + by * span / (if (fine) 100 else 20)).coerceIn(range.start, range.endInclusive) * 100) / 100.0
+                    style.update { it.with(setting, v) }
+                    true
+                }.pointerInput(setting) { detectTapGestures { set(it.x, size.width) } }
                 .pointerInput(setting) {
                     detectHorizontalDragGestures { change, _ ->
                         change.consume()
@@ -911,7 +917,8 @@ private fun ThemeCard(
             .frame(2.dp, if (selected) Palette.accent else Palette.border, bg, radius = 12.dp)
             .clickable(onClick = onClick),
     ) {
-        Thumbnail(theme.preview, selected = false, modifier = Modifier.fillMaxWidth().aspectRatio(16f / 10f), onClick = onClick)
+        // The card takes the tap, so keys stop on it once rather than on it and its picture.
+        Thumbnail(theme.preview, selected = false, modifier = Modifier.fillMaxWidth().aspectRatio(16f / 10f), onClick = null)
         Row(Modifier.padding(6.dp), verticalAlignment = Alignment.CenterVertically) {
             BasicText(theme.title, Modifier.weight(1f), style = Mono.copy(color = theme.colors["foreground"].toColor(), fontSize = TextSize.Small), maxLines = 1)
             for (key in listOf("accent", "red", "green", "yellow")) {
@@ -926,7 +933,8 @@ private fun Thumbnail(
     file: File,
     selected: Boolean,
     modifier: Modifier,
-    onClick: () -> Unit,
+    /** Null when what holds it takes the tap. */
+    onClick: (() -> Unit)?,
     onLongClick: (() -> Unit)? = null,
 ) {
     val haptics = LocalHapticFeedback.current
@@ -936,15 +944,21 @@ private fun Thumbnail(
     Box(
         modifier
             .frame(2.dp, if (selected) Palette.accent else Color.Transparent, Palette.surface, radius = 12.dp)
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick =
-                    onLongClick?.let {
-                        {
-                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                            it()
-                        }
-                    },
+            .then(
+                if (onClick == null) {
+                    Modifier
+                } else {
+                    Modifier.combinedClickable(
+                        onClick = onClick,
+                        onLongClick =
+                            onLongClick?.let {
+                                {
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    it()
+                                }
+                            },
+                    )
+                },
             ),
     ) {
         image?.let { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }

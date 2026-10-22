@@ -34,6 +34,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -142,13 +143,17 @@ private fun Welcome(
         }
     }
     Spacer(Modifier.height(32.dp))
-    // Each theme starts downloading as it's selected, the default one right away.
-    LaunchedEffect(Unit) { themes.prefetch(themes.picked) }
+    // The theme picked starts downloading, the default one right away; another once it stays picked a moment, so
+    // arrowing along the strip doesn't start one for each theme passed (start fetches the picked one anyway).
+    var first by remember { mutableStateOf(true) }
+    LaunchedEffect(themes.picked) {
+        if (!first) delay(PrefetchSettle)
+        first = false
+        themes.prefetch(themes.picked)
+    }
     Appear(1) {
-        ThemeStrip(themes, onPick = {
-            themes.pick(it)
-            themes.prefetch(it.name)
-        })
+        // A key moving along the strip picks as it goes, as a tap does.
+        ThemeStrip(themes, pickOnFocus = true)
     }
     Spacer(Modifier.height(32.dp))
     Appear(2) {
@@ -452,6 +457,7 @@ internal fun ThemeStrip(
     gutter: Dp = Gutter,
     onPick: (BundledTheme) -> Unit = themes::pick,
     onBrowse: (() -> Unit)? = null,
+    pickOnFocus: Boolean = false,
 ) {
     RescanThemes(themes)
     val list = themes.choices
@@ -474,7 +480,7 @@ internal fun ThemeStrip(
             contentPadding = PaddingValues(horizontal = gutter),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            items(list, key = { it.name }) { theme -> ThemeSwatch(theme, theme.name == themes.picked) { onPick(theme) } }
+            items(list, key = { it.name }) { theme -> ThemeSwatch(theme, theme.name == themes.picked, pickOnFocus) { onPick(theme) } }
             if (onBrowse != null) item(key = "browse") { BrowseSwatch(onBrowse) }
         }
     }
@@ -485,6 +491,7 @@ internal fun ThemeStrip(
 private fun ThemeSwatch(
     theme: BundledTheme,
     selected: Boolean,
+    pickOnFocus: Boolean,
     onClick: () -> Unit,
 ) {
     fun color(key: String) = hexColor(theme.colors[key]) ?: Color.Gray
@@ -493,6 +500,7 @@ private fun ThemeSwatch(
         Modifier
             .width(112.dp)
             .frame(if (selected) 2.dp else 1.dp, border, color("background"), radius = 12.dp)
+            .onFocusChanged { if (pickOnFocus && it.isFocused && !selected) onClick() }
             .clickable(onClick = onClick)
             .padding(10.dp),
     ) {
@@ -556,4 +564,7 @@ private val Subtle get() = Palette.foreground.copy(alpha = 0.6f)
 
 /** Side padding of the setup screens. */
 private val Gutter = 24.dp
+
+/** How long a theme stays picked in setup before its download starts. */
+private const val PrefetchSettle = 700L
 

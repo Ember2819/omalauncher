@@ -156,7 +156,11 @@ fun FilesScreen(
 
     Box(Modifier.fillMaxSize().background(Palette.background).safeDrawingPadding().padding(PanelGap)) {
         val q = query
+        // Keys start on the close mark, as in the launcher's panels.
+        val close = remember { FocusRequester() }
         PanelFrame(
+            modifier = Modifier.holdsKeys(start = close),
+            closeFocus = close,
             // Like back, the close mark leaves the selection or the search first.
             onClose = {
                 when {

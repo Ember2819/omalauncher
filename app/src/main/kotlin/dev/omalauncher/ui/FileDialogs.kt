@@ -31,6 +31,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -51,6 +56,10 @@ internal fun DialogFrame(
             Modifier
                 .fillMaxWidth()
                 .frame(2.dp, Palette.accent, Palette.surface, radius = 24.dp)
+                // Keys start in it, and Esc dismisses it as Back does: its own window doesn't pass Esc to the activity's.
+                .onKeyEvent { e ->
+                    (e.key == Key.Escape).also { if (it && e.type == KeyEventType.KeyUp) onDismiss() }
+                }.holdsKeys()
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) { content() }

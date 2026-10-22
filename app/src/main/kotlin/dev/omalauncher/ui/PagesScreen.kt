@@ -25,9 +25,13 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -68,6 +72,16 @@ internal fun PagesScreen(
     var removing by remember { mutableStateOf<Int?>(null) }
     val haptics = LocalHapticFeedback.current
     val gap = with(LocalDensity.current) { RowGap.roundToPx() }
+    // Keys move a page by its handle. Moving renumbers the pages, and rows are keyed by number: the handle at the page's
+    // new place takes focus once the rows show the new order, so a held key keeps moving the same page.
+    val handles = remember { mutableStateMapOf<Int, FocusRequester>() }
+    var follow by remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(follow) {
+        val i = follow ?: return@LaunchedEffect
+        withFrameNanos {}
+        engine.pages.getOrNull(i)?.let { handles[it]?.requestFocus() }
+        follow = null
+    }
     OverlayPanel("pages", onDismiss, contentWidth = ReadingWidth) {
         BasicText(
             "Home's pages, left to right. Drag one by ≡ to move it. Home opens on the first with tiles; faces before it sit left of it.",
@@ -85,6 +99,11 @@ internal fun PagesScreen(
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(RowGap)) {
             for (page in if (dragged == null) pages else order) {
                 key(page) {
+                    val handleFocus = remember { FocusRequester() }
+                    DisposableEffect(page) {
+                        handles[page] = handleFocus
+                        onDispose { if (handles[page] === handleFocus) handles.remove(page) }
+                    }
                     val lifted = dragged == page
                     PageRow(
                         page = page,
@@ -101,7 +120,20 @@ internal fun PagesScreen(
                                     .onSizeChanged { heights[page] = it.height },
                         // The handle drags at once, without waiting for a long press; the rest of the row scrolls the list.
                         handle =
-                            Modifier.pointerInput(page) {
+                            Modifier
+                                .focusRequester(handleFocus)
+                                .keyStepped(vertical = true) { by, _ ->
+                                    // One move a frame, as the last one's focus follows; past either end, the arrow moves focus.
+                                    if (follow != null) return@keyStepped true
+                                    val now = engine.pages
+                                    val i = now.indexOf(page)
+                                    val to = i + by
+                                    if (i < 0 || to !in now.indices) return@keyStepped false
+                                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    engine.arrangePages(now.toMutableList().apply { add(to, removeAt(i)) })
+                                    follow = to
+                                    true
+                                }.pointerInput(page) {
                                     detectVerticalDragGestures(
                                         onDragStart = {
                                             haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)

@@ -20,6 +20,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
 import dev.omalauncher.ui.Palette
 import dev.omalauncher.theme.Style
+import dev.omalauncher.ui.KeyIndicated
+import dev.omalauncher.ui.arrowKeys
+import dev.omalauncher.ui.keysStartAgain
 import dev.omalauncher.ui.LauncherStyle
 import dev.omalauncher.ui.SystemBarsEffect
 import dev.omalauncher.ui.applySystemBars
@@ -46,7 +49,7 @@ class MainActivity : ComponentActivity() {
         runtime.start()
         state.onSettings = { page, homePage -> runtime.openSettings(page, homePage) }
         setContent {
-            LauncherRoot(runtime, state)
+            KeyIndicated { LauncherRoot(runtime, state) }
             SystemBarsEffect(this@MainActivity)
             // A face whose statusBar is false takes the status bar's room too.
             val fullScreen by remember { derivedStateOf { state.fullScreen && runtime.widgets.openScreen == null } }
@@ -144,12 +147,20 @@ class MainActivity : ComponentActivity() {
     }
 
     // Lint flags super.dispatchKeyEvent: ComponentActivity marks its override @RestrictTo, but Activity's is public API.
-    /** Launcher shortcuts (Super+key), then typing into a terminal tile that has the keyboard. Back stays the launcher's. */
+    /**
+     * Launcher shortcuts (Super+key), then typing into a terminal tile that has the keyboard. Back stays the launcher's,
+     * and so does Esc that nothing else took ([escapeAsBack]): it closes the drawer, a panel or a widget's screen.
+     */
     @SuppressLint("RestrictedApi")
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.isMetaPressed && event.action == KeyEvent.ACTION_DOWN && shortcut(event.keyCode)) return true
         if (event.keyCode != KeyEvent.KEYCODE_BACK && runtime.terminals.active != null && runtime.keyboard.handle(event)) return true
-        return super.dispatchKeyEvent(event)
+        // Nothing in the window has the keys (yet, or since a tap), so an arrow has nowhere to move from: it starts in the
+        // open panel, or at home's first tile.
+        if (event.keyCode in arrowKeys && event.action == KeyEvent.ACTION_DOWN && !state.keysFocused) {
+            if (keysStartAgain(window.decorView) || state.focusHome()) return true
+        }
+        return super.dispatchKeyEvent(event) || escapeAsBack(event)
     }
 
     /** Widgets only refresh while the home screen is visible. */
