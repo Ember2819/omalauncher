@@ -311,7 +311,17 @@ fun Modifier.keysRoot(): Modifier {
 /** A key went down in [window]: keys [passesKeys] had nowhere to pass go where it takes them, not to what shows later. */
 fun keyPressed(window: View) {
     waiting -= window.rootView
+    keyDownAt = SystemClock.uptimeMillis()
 }
+
+/** When a key last went down, for [focusFromKey]. */
+private var keyDownAt = 0L
+
+/**
+ * Whether focus arriving now is a key's doing, rather than Android's own: a window's first layout gives its first node
+ * focus by itself, keys in use or not.
+ */
+fun focusFromKey() = keyDownAt > 0 && SystemClock.uptimeMillis() - keyDownAt < 500
 
 /**
  * Where keys' focus is on this as it goes, or as it stops taking focus, like a remove button swapped for its confirm or

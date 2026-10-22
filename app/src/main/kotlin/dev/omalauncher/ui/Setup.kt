@@ -37,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -491,7 +492,7 @@ internal fun ThemeStrip(
         ) {
             items(list, key = { it.name }) { theme ->
                 val selected = theme.name == themes.picked
-                ThemeSwatch(theme, selected, pickOnFocus, if (selected) pickedFocus else null) { onPick(theme) }
+                ThemeSwatch(theme, selected, pickOnFocus, pickedFocus) { onPick(theme) }
             }
             if (onBrowse != null) item(key = "browse") { BrowseSwatch(onBrowse) }
         }
@@ -504,17 +505,24 @@ private fun ThemeSwatch(
     theme: BundledTheme,
     selected: Boolean,
     pickOnFocus: Boolean,
-    focus: FocusRequester?,
+    /** The picked theme's swatch, which keys start on. */
+    picked: FocusRequester?,
     onClick: () -> Unit,
 ) {
+    val view = LocalView.current
     fun color(key: String) = hexColor(theme.colors[key]) ?: Color.Gray
     val border by animateColorAsState(if (selected) Palette.accent else Palette.border, label = "swatch")
     Column(
         Modifier
             .width(112.dp)
             .frame(if (selected) 2.dp else 1.dp, border, color("background"), radius = 12.dp)
-            .then(focus?.let { Modifier.focusRequester(it) } ?: Modifier)
-            .onFocusChanged { if (pickOnFocus && it.isFocused && !selected) onClick() }
+            .then(if (selected && picked != null) Modifier.focusRequester(picked) else Modifier)
+            .onFocusChanged {
+                if (!pickOnFocus || !it.isFocused || selected) return@onFocusChanged
+                // Only as keys move it: as setup first shows, Android gives the strip's first swatch focus by itself,
+                // which goes on to the picked one for keys to start on.
+                if (focusFromKey()) onClick() else view.post { picked?.requestFocus() }
+            }
             .clickable(onClick = onClick)
             .padding(10.dp),
     ) {
