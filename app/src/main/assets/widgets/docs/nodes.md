@@ -65,8 +65,10 @@ Shader apply at draw time. Changing them, even every frame, costs no layout.
 
 The tile's size is available as `cols` and `rows` (grid cells) and `tileWidth` and
 `tileHeight` (dp, including the tile padding). They change when the user resizes the
-tile, so a widget can pick a layout to fit (`if cols < 3 { ... } else { ... }`). They're
-`null` for a moment before the tile is laid out. A widget's own declaration named
+tile, so a widget can pick a layout to fit (`if (tileHeight ?? 999) < 185 { ... } else { ... }`).
+Decide by `tileWidth` and `tileHeight`, not `cols` and `rows`: a grid row is a different number
+of dp on every phone, so a 3-row tile on a tall phone has room a check like `rows < 4` throws
+away. They're `null` for a moment before the tile is laid out. A widget's own declaration named
 `rows` or `cols` takes precedence.
 
 `corners` is the user's corner style as a multiplier, not a radius: 0 (edge, square), 0.5
