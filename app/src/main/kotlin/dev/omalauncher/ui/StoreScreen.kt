@@ -393,6 +393,27 @@ private fun rememberIcon(
     return icon
 }
 
+/**
+ * [e]'s preview the size a card draws it. Cards are at least 150 dp wide and, with an adaptive grid, under twice that and the gap;
+ * less their padding, a preview is [CardPreviewWidth] at most and [CardPreviewHeight] high, and a whole screen shows
+ * its top [CardPreviewHeight] / [CardPreviewMinWidth] of its width at most.
+ */
+@Composable
+private fun rememberCardPreview(
+    market: Market,
+    e: CatalogEntry,
+    theme: String?,
+): ImageBitmap? {
+    val (w, h) = with(LocalDensity.current) { CardPreviewWidth.roundToPx() to CardPreviewHeight.roundToPx() }
+    val top = if (market.kind == OwlKind.Widget) null else CardPreviewHeight / CardPreviewMinWidth
+    val preview by produceState<ImageBitmap?>(null, e.previewFor(theme), w, h) { value = market.thumbnail(e, theme, w, h, top) }
+    return preview
+}
+
+private val CardPreviewHeight = 104.dp
+private val CardPreviewMinWidth = 150.dp - 16.dp
+private val CardPreviewWidth = 150.dp * 2 + 8.dp - 16.dp
+
 /** A grid cell: the preview, the name, and whether it's installed; [selected] while its page shows beside the grid. */
 @Composable
 private fun Card(
@@ -403,7 +424,7 @@ private fun Card(
     selected: Boolean,
     onOpen: () -> Unit,
 ) {
-    val preview = rememberPreview(market, e, theme)
+    val preview = rememberCardPreview(market, e, theme)
     val busy = market.busy[e.id]
     val update = market.hasUpdate(e)
     val installed = market.installedVersion(e) != null
@@ -415,7 +436,7 @@ private fun Card(
             .padding(8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Box(Modifier.fillMaxWidth().height(104.dp), contentAlignment = Alignment.Center) {
+        Box(Modifier.fillMaxWidth().height(CardPreviewHeight), contentAlignment = Alignment.Center) {
             if (preview != null && market.kind != OwlKind.Widget) {
                 // A whole phone screen would be a sliver this high: its top, as wide as the card, reads as the app or face.
                 Image(preview, null, Modifier.fillMaxSize(), alignment = Alignment.TopCenter, contentScale = ContentScale.FillWidth)
