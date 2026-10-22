@@ -22,6 +22,8 @@ panel "controls" {
   state swiped = ""
 
   let wide = screenWidth ?? 400
+  // The output's words, for one without a name of its own.
+  let outputs = {speaker: "this phone", wired: "headphones", usb: "usb audio", hdmi: "hdmi", dock: "dock", bluetooth: "bluetooth"}
   let cols = wide >= 600 ? 6 : wide >= 440 ? 4 : 3
   // A switch, and what a tap does: torch and sound switch here; Android lets a launcher only read the others, so a
   // tap opens its own panel for them, settings(act).
@@ -137,6 +139,16 @@ panel "controls" {
         Slider { value: v.muted ? 0 : v.level; step: 100 / (v.steps ?? 15); live: true; color: accent; track: background; weight: 1; onChange: volume(value) }
         Text { text: "]"; color: accent }
         Text { text: v.muted ? "♪ off" : "♪ on"; color: orange; width: 56; align: end; onTap: volume("toggle") }
+      }
+      // Where the sound goes; a tap opens Android's output switcher, to move it to headphones or a speaker.
+      Row {
+        fill: width
+        align: center
+        gap: 4
+        onTap: settings("output")
+        Text { text: "output"; width: 72 }
+        Text { text: v.output.name ?? outputs[v.output.type] ?? v.output.type; color: v.output.type == "speaker" ? foreground : green; weight: 1; maxLines: 1 }
+        Text { text: "⇄ pick"; color: orange; width: 56; align: end }
       }
     }
 

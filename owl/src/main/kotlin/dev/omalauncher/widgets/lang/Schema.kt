@@ -135,7 +135,9 @@ internal val SINCE =
         // not switch, the other volume streams, and a notification's buttons and replies.
         listOf("settings", VOLUME_STREAM, "notification(\"clear\")", "notification(\"action\")", "notification(\"reply\")").associateWith { 13 } +
         // owl 13: drags along one direction, which leave the other to the list they're in, and their end.
-        listOf("drag", "onDragEnd").associateWith { 13 }
+        listOf("drag", "onDragEnd").associateWith { 13 } +
+        // owl 13: the bytes the phone sent and received, for throughput.
+        mapOf("android.network" to 13)
 
 /** volume(level, stream), named like this in [SINCE]. */
 internal const val VOLUME_STREAM = "volume(…, stream)"
@@ -212,8 +214,8 @@ internal val HANDLER_KINDS = mapOf("onChange" to setOf("Slider", "Input"), "onSu
 /** What triggers bind in their statements. */
 internal val TRIGGER_PARAMS = mapOf("on" to listOf("value", "old"))
 
-/** Data from the phone and the launcher; device is fixed, system is polled, the rest update as they change. */
-internal val ANDROID = setOf("battery", "device", "media", "notifications", "volume", "system", "alarm", "modes", "apps", "agents", "recent", "drawer", "modifiers")
+/** Data from the phone and the launcher; device is fixed, system and network are polled, the rest update as they change. */
+internal val ANDROID = setOf("battery", "device", "media", "notifications", "volume", "system", "network", "alarm", "modes", "apps", "agents", "recent", "drawer", "modifiers")
 
 /**
  * The words an action's first value may be, when it's written out; [numbers] also allows a number. [forms] are the
@@ -227,7 +229,7 @@ internal class Words(
 )
 
 /** settings("...")'s pages. */
-internal val SETTINGS_PAGES = setOf("internet", "wifi", "bluetooth", "airplane", "data", "location", "cast", "nfc", "volume", "sound", "dnd", "display", "dark", "battery", "notifications")
+internal val SETTINGS_PAGES = setOf("internet", "wifi", "bluetooth", "airplane", "data", "location", "cast", "nfc", "volume", "output", "sound", "dnd", "display", "dark", "battery", "notifications")
 
 internal val ACTION_WORDS =
     mapOf(

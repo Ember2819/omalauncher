@@ -26,5 +26,5 @@ file only this phone runs, `owl: 12` is fine; for the store, a lower level reach
   `minLines` and an app's `statusBar`. A Column in a Row is as wide as its content
 - **12**: `screenTop`, `gapsIn`, `gapsOut`, `borderWidth`, `keybar "…" { }` files, `pressKey`, `typeText`, `latch`, `android.modifiers`, `onPress`,
   `onRelease`, `repeats`, post's `method:`, `toBase64`, `fromBase64`, `secret` states and Input's `password`
-- **13**: `settings`, `notification("clear")`, `"action"` and `"reply"`, `volume`'s stream, `drag`, `onDragEnd`, and in `android.modes` the radios,
-  location, rotation, dark theme and brightness
+- **13**: `settings`, `notification("clear")`, `"action"` and `"reply"`, `volume`'s stream, `drag`, `onDragEnd`, `android.network`, `android.volume`'s
+  `output`, and in `android.modes` the radios, location, rotation, dark theme and brightness

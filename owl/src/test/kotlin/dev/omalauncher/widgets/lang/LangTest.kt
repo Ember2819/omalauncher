@@ -884,6 +884,20 @@ class LangTest {
         assertTrue(compileError("widget {\n source c = file(\"/x\")\n Text { text: c } }").contains("file needs owl 4"))
     }
 
+    @Test fun androidNetwork() {
+        val p =
+            Compiler.compile(
+                "widget {\n meta { owl: 13 }\n source n = android.network every 2s\n state down = 0\n" +
+                    " on n { if old != null && value.rx >= old.rx { down = (value.rx - old.rx) / (value.uptime - old.uptime) } }\n" +
+                    " Text { text: fmtBytes(down) + \"/s\" } }",
+            )
+        val n = p.globals.first() as Global.Source
+        assertEquals("android.network", n.kind)
+        assertEquals(2.0, n.every, 0.0)
+        assertTrue(!p.needsLinux)
+        assertTrue(compileError("widget {\n meta { owl: 12 }\n source n = android.network\n Text { text: 1 } }").contains("android.network needs owl 13"))
+    }
+
     @Test fun androidAlarmModesAndPhoneActions() {
         val p = Compiler.compile("widget {\n meta { owl: 7 }\n source a = android.alarm\n source m = android.modes\n Text { text: a.time; onTap: { torch(\"toggle\"); torch(!m.torch); share(\"hi\"); haptic() } } }")
         assertEquals(listOf("android.alarm", "android.modes"), p.globals.map { (it as Global.Source).kind })
@@ -1257,7 +1271,7 @@ class LangTest {
     @Test fun phoneControlsOfOwl13() {
         val p =
             Compiler.compile(
-                "widget {\n meta { owl: 13 }\n source n = android.notifications\n Text { text: 1; onTap: { settings(\"wifi\"); volume(30, \"ring\"); notification(\"clear\"); " +
+                "widget {\n meta { owl: 13 }\n source n = android.notifications\n Text { text: 1; onTap: { settings(\"wifi\"); settings(\"output\"); volume(30, \"ring\"); notification(\"clear\"); " +
                     "notification(\"action\", n.items[0].key, 0); notification(\"reply\", n.items[0].key, \"on my way\") } } }",
             )
         assertTrue(p.commands.contains("reply to notifications as you: on my way"))

@@ -13,7 +13,12 @@ import android.util.Log
 class SystemPanels(
     private val context: Context,
 ) {
-    fun open(page: String) {
+    /** [playing] is the app whose sound `settings("output")` moves; without one, the phone's. */
+    fun open(
+        page: String,
+        playing: String? = null,
+    ) {
+        if (page == "output" && outputSwitcher(playing)) return
         // The first the phone has: a panel (a sheet over home) where Android has one, else the settings screen.
         for (action in PAGES[page] ?: return) {
             try {
@@ -27,7 +32,26 @@ class SystemPanels(
         }
     }
 
+    /**
+     * Android's output switcher, the sheet its media controls open: System UI's, which takes a broadcast. Not public
+     * API, so only where System UI says it has it; false where it doesn't.
+     */
+    private fun outputSwitcher(playing: String?): Boolean {
+        val intent =
+            if (playing != null) {
+                Intent(ACTION_MEDIA_OUTPUT).putExtra("package_name", playing)
+            } else {
+                Intent(ACTION_SYSTEM_MEDIA_OUTPUT)
+            }.setPackage(SYSTEM_UI)
+        if (context.packageManager.queryBroadcastReceivers(intent, 0).isEmpty()) return false
+        context.sendBroadcast(intent)
+        return true
+    }
+
     private companion object {
+        const val SYSTEM_UI = "com.android.systemui"
+        const val ACTION_MEDIA_OUTPUT = "com.android.systemui.action.LAUNCH_MEDIA_OUTPUT_DIALOG"
+        const val ACTION_SYSTEM_MEDIA_OUTPUT = "com.android.systemui.action.LAUNCH_SYSTEM_MEDIA_OUTPUT_DIALOG"
 
         /** Keyed by the words in owl's SETTINGS_PAGES. The hidden actions are on every phone so far; the screen after each is where it isn't. */
         val PAGES =
@@ -41,6 +65,8 @@ class SystemPanels(
                 "cast" to listOf(Settings.ACTION_CAST_SETTINGS),
                 "nfc" to listOf(Settings.Panel.ACTION_NFC, Settings.ACTION_NFC_SETTINGS),
                 "volume" to listOf(Settings.Panel.ACTION_VOLUME, Settings.ACTION_SOUND_SETTINGS),
+                // Where System UI has no output switcher (see outputSwitcher): pairing and picking a device.
+                "output" to listOf(Settings.ACTION_BLUETOOTH_SETTINGS),
                 "sound" to listOf(Settings.ACTION_SOUND_SETTINGS),
                 "dnd" to listOf("android.settings.ZEN_MODE_SETTINGS", Settings.ACTION_SOUND_SETTINGS),
                 "display" to listOf(Settings.ACTION_DISPLAY_SETTINGS),
