@@ -189,12 +189,11 @@ private fun DesktopScreen(
     }
 
     if (panelShown) {
-        // Near-opaque like stock drawers: home widgets bleeding through made icons hard to read.
         Box(
             Modifier
                 .fillMaxSize()
                 .graphicsLayer { alpha = state.drawer.value.coerceAtMost(1f) }
-                .background(Palette.background.copy(alpha = 0.97f))
+                .background(Palette.panel)
                 .clickable { state.close() }
                 .drawerSwipe(state),
         )

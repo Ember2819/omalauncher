@@ -148,6 +148,9 @@ fun StyleScreen(
             NumberSlider("opacity", style, Style.TILE_OPACITY)
             Flag("frosted glass", "on", "off", style, Style.TILE_FROST)
             WidgetPreview()
+            // The drawer and the swipe-down panel, over home.
+            Heading("panels")
+            NumberSlider("opacity", style, Style.PANEL_OPACITY)
             Heading("screens")
             Stepper("gaps out", style, Style.SCREEN_GAPS_OUT)
             Stepper("border width", style, Style.SCREEN_BORDER_WIDTH)

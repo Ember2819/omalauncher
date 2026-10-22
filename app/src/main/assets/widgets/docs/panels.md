@@ -20,6 +20,10 @@ their apps (a panel picked for swiping down that's broken opens nothing). Home's
 with "(has errors)". Compare `drawer.owl` with `.stock-drawer.owl` to see what changed in the stock drawer since. With
 nothing on swipe up, tapping the bar still opens the drawer.
 
+Behind a panel the launcher draws the theme's background, as opaque as `panels.opacity` in style.toml says (0.97, so
+home barely shows through; the user's to change). Leave a panel's outer node without a `background` of its own, or it
+covers home whatever that setting is; a background on the boxes inside it is fine.
+
 ```owl
 panel "my drawer" {
   meta { owl: 11 }

@@ -54,7 +54,6 @@ panel "controls" {
     fill: true
     gap: 12
     padding: 16
-    background: background
     scroll: true
 
     Row {
