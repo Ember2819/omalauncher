@@ -62,6 +62,12 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -255,6 +261,7 @@ fun HomeScreen(
     var origin by remember { mutableStateOf(Offset.Zero) }
     val extraKeys = terminals.active != null && extraKeysWanted()
     val side = homeSide()
+    val focusManager = LocalFocusManager.current
     val turned = homeTurned()
     val sideRoom = sideWidth()
     val barRoom = with(density) { state.barHeight.takeIf { it > 0 }?.toDp() ?: (PromptBarHeight + HomeGap + EdgeGap) }
@@ -343,6 +350,25 @@ fun HomeScreen(
                     .fillMaxWidth()
                     // Down out of the tiles stops at the recent apps first, which Compose's own search passes over.
                     .focusProperties { onExit = { if (requestedFocusDirection == FocusDirection.Down) state.stripEntry.requestFocus() } }
+                    // In landscape there's nothing below for that search to find, so it never leaves: Down, or the arrow
+                    // toward the rail once there's no page left to turn to that way, goes to the recent apps (the bar's
+                    // rail without them) where the arrow finds nothing else.
+                    .then(
+                        if (side == null) {
+                            Modifier
+                        } else {
+                            Modifier.onKeyEvent { e ->
+                                val direction =
+                                    when (e.key) {
+                                        Key.DirectionDown -> FocusDirection.Down
+                                        Key.DirectionLeft -> FocusDirection.Left.takeIf { side == HomeSide.Left }
+                                        Key.DirectionRight -> FocusDirection.Right.takeIf { side == HomeSide.Right }
+                                        else -> null
+                                    } ?: return@onKeyEvent false
+                                e.type == KeyEventType.KeyDown && (focusManager.moveFocus(direction) || state.stripEntry.requestFocus())
+                            }
+                        },
+                    )
                     .focusRequester(state.homeEntry)
                     .focusGroup(),
             selected = state.editing,

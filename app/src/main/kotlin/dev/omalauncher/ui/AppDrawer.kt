@@ -253,8 +253,12 @@ internal fun RecentStrip(
     handlers: AppHandlers,
     modifier: Modifier = Modifier,
     vertical: Boolean = false,
-    /** Where Up goes from its apps; on each, as the list's own focus group keeps it from reaching them from outside. */
-    up: FocusRequester? = null,
+    /**
+     * Where keys go from its apps toward the grid: Up, or stood up on [side], across to it. On each, as the list's own
+     * focus group keeps it from reaching them from outside.
+     */
+    home: FocusRequester? = null,
+    side: HomeSide? = null,
 ) {
     val apps = recentApps(runtime, 20)
     // Nothing opened yet: no strip, but its room stays, so home doesn't shift when the first app shows up.
@@ -275,7 +279,7 @@ internal fun RecentStrip(
         val cells: LazyListScope.() -> Unit = {
             items(apps, key = { it.key }) { hit ->
                 val (icon, mask) = hit.icons(runtime)
-                Box(if (up != null) Modifier.focusProperties { this.up = up } else Modifier) {
+                Box(if (home != null) Modifier.focusProperties { toHome(side, home) } else Modifier) {
                     StripCell(hit.label, icon, mask, onClick = { handlers.launch(hit) }, actions = { hit.actions(handlers) }, shortcuts = { hit.shortcutMenu(handlers) }, spoken = hit.spoken, paused = hit.paused(runtime))
                 }
             }
