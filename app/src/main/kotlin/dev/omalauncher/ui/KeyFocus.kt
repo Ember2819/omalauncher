@@ -36,6 +36,9 @@ import androidx.compose.ui.graphics.drawscope.inset
 import androidx.compose.ui.node.DelegatableNode
 import androidx.compose.ui.node.DrawModifierNode
 import androidx.compose.ui.node.invalidateDraw
+import androidx.compose.ui.node.ModifierNodeElement
+import androidx.compose.ui.node.requireLayoutCoordinates
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import androidx.compose.ui.focus.FocusDirection
@@ -65,7 +68,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.toSize
@@ -189,8 +191,9 @@ fun Modifier.holdsKeys(
     val inputMode = LocalInputModeManager.current
     val view = LocalView.current
     val window = LocalWindowInfo.current
+    val screen = LocalKeysScreen.current ?: view.rootView
     val entry = remember { FocusRequester() }
-    val holder = remember(view, start, traps) { KeyHolder(view, entry, start, traps) }
+    val holder = remember(view, screen, start, traps) { KeyHolder(view, screen, entry, start, traps) }
     DisposableEffect(holder) {
         holders += holder
         onDispose {
@@ -198,17 +201,19 @@ fun Modifier.holdsKeys(
             holders -= holder
             // What's under it gets the keys back where they were: a panel gone from the window leaves Compose giving
             // them to the window's first node, and a menu's or a dialog's own window gives them back to none in particular.
-            val under = holders.lastOrNull()
+            // Only on its own screen: one closing over another activity's leaves that one's keys alone.
+            val under = holders.lastOrNull { it.screen === holder.screen }
             if (newest && under != null && inputMode.inputMode == InputMode.Keyboard) under.view.post { under.enter(first = true) }
         }
     }
     LaunchedEffect(holder) {
         if (!enters) return@LaunchedEffect
+        // Where keys are under it, before a menu's or a dialog's own window gives its first node focus.
+        holders.lastOrNull { it !== holder && it.screen === screen && it.focused }?.back = lastFocused
         // A new window, like a screen's or a dialog's, knows whether keys are in use once it has focus, and Compose then
         // gives its first node focus by itself: going in after that, it starts where it should.
         snapshotFlow { window.isWindowFocused }.first { it }
         if (inputMode.inputMode != InputMode.Keyboard) return@LaunchedEffect
-        holders.lastOrNull { it !== holder && it.view.rootView === view.rootView && it.focused }?.back = lastFocused
         // Content that isn't laid out yet takes it a frame later.
         if (!holder.enter(first = true)) withFrameNanos {}.also { holder.enter(first = true) }
     }
@@ -222,9 +227,13 @@ fun Modifier.holdsKeys(
         }.focusGroup()
 }
 
-/** A [holdsKeys] showing in [view]'s window, and how keys go into it: back where they were, else at [start]. */
+/**
+ * A [holdsKeys] showing in [view]'s window, on [screen] (its activity's, which a menu's or a dialog's window is on
+ * too), and how keys go into it: back where they were, else at [start].
+ */
 private class KeyHolder(
     val view: View,
+    val screen: View,
     private val entry: FocusRequester,
     private val start: FocusRequester?,
     val traps: Boolean,
@@ -400,15 +409,15 @@ fun Modifier.keyScrolled(around: Boolean = false): Modifier {
     val requester = remember { BringIntoViewRequester() }
     val step = with(LocalDensity.current) { 48.dp.toPx() }
     var focused by remember { mutableStateOf(false) }
-    val laid = remember { arrayOfNulls<LayoutCoordinates>(1) }
+    val laid = remember { arrayOfNulls<Laid>(1) }
     return this
         .bringIntoViewRequester(requester)
-        .onGloballyPositioned { laid[0] = it }
+        .then(LaidElement(laid))
         .focusProperties { canFocus = inputMode.inputMode == InputMode.Keyboard }
         .onFocusChanged { focused = it.isFocused }
         .onKeyEvent { e ->
             if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
-            val at = laid[0]?.takeIf { it.isAttached } ?: return@onKeyEvent false
+            val at = laid[0]?.coordinates() ?: return@onKeyEvent false
             // What shows of it, in its own coordinates: its bounds in the window are cut to what it's in.
             val seen = at.boundsInWindow().translate(-at.positionInWindow())
             if (seen.isEmpty) return@onKeyEvent false
@@ -435,6 +444,27 @@ fun Modifier.keyScrolled(around: Boolean = false): Modifier {
                 inset(out) { drawKeyFocus() }
             }
         }
+}
+
+/**
+ * Where what it's on is laid out, as a key asks: onGloballyPositioned would be told on each frame of a scroll around it.
+ */
+private class Laid : Modifier.Node() {
+    fun coordinates(): LayoutCoordinates? = if (isAttached) runCatching { requireLayoutCoordinates() }.getOrNull() else null
+}
+
+private class LaidElement(
+    private val into: Array<Laid?>,
+) : ModifierNodeElement<Laid>() {
+    override fun create() = Laid().also { into[0] = it }
+
+    override fun update(node: Laid) {
+        into[0] = node
+    }
+
+    override fun equals(other: Any?) = other is LaidElement && other.into === into
+
+    override fun hashCode() = System.identityHashCode(into)
 }
 
 /**
@@ -504,6 +534,10 @@ private object KeyIndication : IndicationNodeFactory {
     }
 }
 
-/** Gives every clickable in [content] the launcher's [KeyIndication]. */
+/** The activity's window that [holdsKeys] are on, menus' and dialogs' own windows too. */
+private val LocalKeysScreen = staticCompositionLocalOf<View?> { null }
+
+/** Gives every clickable in [content] the launcher's [KeyIndication], and its [holdsKeys] their activity's window. */
 @Composable
-fun KeyIndicated(content: @Composable () -> Unit) = CompositionLocalProvider(LocalIndication provides KeyIndication, content = content)
+fun KeyIndicated(content: @Composable () -> Unit) =
+    CompositionLocalProvider(LocalIndication provides KeyIndication, LocalKeysScreen provides LocalView.current.rootView, content = content)
