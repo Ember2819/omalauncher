@@ -49,9 +49,11 @@ agent can rewrite it. Here Grok sorts it into folders:
 
 Touch input in Linux windows: tap is a left click, long press is a right
 click, drag scrolls; apps with touch support (foot, GTK) get real touch.
-Hardware keyboard shortcuts: Super+Enter (terminal), Super+Space or
-Super+A (the bar), Super+Down (the swipe-down panel), Super+1..9 (home pages)
-on the home screen; Super+Enter and Super+W (close) in Linux windows.
+Hardware keyboard shortcuts: Super+D (the drawer), Super+T (terminal),
+Super+Down (the swipe-down panel), Super+1..9 (home pages) on the home screen;
+Super+W (close) in Linux windows. Android keeps Super on its own, Super+Space,
+Super+A and Super+Enter for itself, so Omarchy's Super+Space and Super+Enter
+can't be used.
 Super+Esc leaves a Linux window or a terminal tile without closing it, since
 Esc itself is theirs; a gamepad's B (Back) does too, as its buttons stay the
 launcher's. On home, in the app drawer, panels and

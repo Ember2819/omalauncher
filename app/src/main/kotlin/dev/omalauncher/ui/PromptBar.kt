@@ -207,7 +207,7 @@ internal fun PromptBar(
         }
         state.promptRequest = null
     }
-    // The panel and the bar open and close together: opening it (Super+Space, a widget) focuses the bar, closing it lets go.
+    // The panel and the bar open and close together: opening it (Super+D, a widget) focuses the bar, closing it lets go.
     LaunchedEffect(panelShown) {
         // Opened to dictate, the keyboard stays down.
         if (panelShown && !speech.listening) {
@@ -290,7 +290,7 @@ internal fun PromptBar(
                             .focusRequester(focus)
                             .onFocusChanged {
                                 focused = it.isFocused
-                                // Tapped (or Super+A): the panel opens. Mid-swipe it's already showing.
+                                // Tapped (or Super+D): the panel opens. Mid-swipe it's already showing.
                                 if (it.isFocused && !panelShown) state.open()
                             }
                             // Esc closes the drawer, as Omarchy's launcher does, before the soft keyboard can keep it to itself.

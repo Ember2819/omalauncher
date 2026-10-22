@@ -193,8 +193,10 @@ class MainActivity : ComponentActivity() {
         when (keyCode) {
             // Lets go of the terminal tile that has the keys, as Back or a tap outside does, where Esc itself is its own.
             KeyEvent.KEYCODE_ESCAPE -> if (runtime.terminals.active != null) runtime.terminals.deactivate() else return false
-            KeyEvent.KEYCODE_ENTER -> runtime.terminal(null, "Terminal")
-            KeyEvent.KEYCODE_SPACE -> state.toggle()
+            // Super+D and Super+T, as Android keeps Omarchy's Super+Space (the Assistant on a Pixel) and Super+Enter (Home)
+            // for itself; those stay for phones that pass them on.
+            KeyEvent.KEYCODE_D, KeyEvent.KEYCODE_SPACE -> state.toggle()
+            KeyEvent.KEYCODE_T, KeyEvent.KEYCODE_ENTER -> runtime.terminal(null, "Terminal")
             // The panel swiping down opens, and closed again: it comes from above, as the drawer from the bar.
             KeyEvent.KEYCODE_DPAD_DOWN ->
                 if (state.pulled != null) {
