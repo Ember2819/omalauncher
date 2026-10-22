@@ -50,7 +50,8 @@ Every node also takes:
 - `animate prop: spring()` or `tween(300ms, "linear"/"in"/"out"/"ease")`, for `value`,
   `opacity`, `rotation`, `scale`, `color` or `background`, and `offset` (owl 13). For springs:
   `spring(damping, stiffness)`. While a node's own `onDrag` has the finger, its animated `offset` follows the finger
-  as it is; let go, it eases to where `onDragEnd` puts it, so a row swiped too little springs back
+  as it is; let go, it eases to where `onDragEnd` puts it, so a row swiped too little springs back. Only its own: an `onDrag` on a
+  parent or a child doesn't count, and the offset trails the finger on its spring
 
 `opacity`, `rotation`, `scale`, `offset`, colors and the contents of Canvas and
 Shader apply at draw time. Changing them, even every frame, costs no layout.

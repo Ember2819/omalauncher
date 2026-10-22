@@ -28,4 +28,6 @@ file only this phone runs, `owl: 12` is fine; for the store, a lower level reach
   `onRelease`, `repeats`, post's `method:`, `toBase64`, `fromBase64`, `secret` states and Input's `password`
 - **13**: `settings`, `notification("clear")`, `"action"` and `"reply"`, `volume`'s stream, `drag`, `onDragEnd`, `android.network`, `android.volume`'s
   `output`, a panel's `opacity`, `android.sim`, `dnd`, `torch(level)`,
-  `notification("snooze")`, `animate offset`, and in `android.modes` the radios, location, rotation, dark theme, brightness, `dndLevel` and `torchLevel`
+  `notification("snooze")`, `"snoozeAll"`, `"unsnooze"` and `"unsnoozeAll"`, `animate offset`, and in `android.modes` the radios, location, rotation, dark theme, brightness, `dndAllows` and `torchLevel`.
+  Only a brightness written out, `torch(40)`, asks for owl 13; `torch(value)` from a Slider can't be told from on and off when the file is
+  checked, so a file that dims the torch should say `owl: 13` itself, as older launchers do nothing with a number

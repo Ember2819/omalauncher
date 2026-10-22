@@ -115,15 +115,15 @@ class Modes(
     }
 
     /** Off means every notification gets through; anything else is Do Not Disturb in some form. */
-    private fun dndOn() = dndLevel() != "off"
+    private fun dndOn() = dndAllows() != "all"
 
-    /** How much Do Not Disturb lets through: "off", "priority" (the user's exceptions), "alarms" or "silence". */
-    private fun dndLevel() =
+    /** What gets through Do Not Disturb: "all" (it's off), "priority" (the user's exceptions), "alarms" or "none". */
+    private fun dndAllows() =
         when (notifications.currentInterruptionFilter) {
             NotificationManager.INTERRUPTION_FILTER_PRIORITY -> "priority"
             NotificationManager.INTERRUPTION_FILTER_ALARMS -> "alarms"
-            NotificationManager.INTERRUPTION_FILTER_NONE -> "silence"
-            else -> "off"
+            NotificationManager.INTERRUPTION_FILTER_NONE -> "none"
+            else -> "all"
         }
 
     /** The levels dnd(...) and torch(...) picked last, which turning them on uses again. */
@@ -133,7 +133,7 @@ class Modes(
         Obj(
             mapOf(
                 "dnd" to bool(dndOn()),
-                "dndLevel" to Str(dndLevel()),
+                "dndAllows" to Str(dndAllows()),
                 "saver" to bool(power.isPowerSaveMode),
                 "ringer" to
                     Str(
@@ -220,8 +220,9 @@ class Modes(
 
     /**
      * dnd(true), dnd(false), or dnd("on"), "off", "toggle": Do Not Disturb as the quick settings tile switches it, letting
-     * through what the user's settings let through, or alarms only if dnd("alarms") picked that last; dnd("priority") and
-     * dnd("alarms") pick the level and turn it on. A notification listener may; false without notification access.
+     * through what the user's settings let through, or what dnd(...) picked last; dnd("priority"), "alarms" and "none"
+     * pick what gets through and turn it on, and "all" turns it off, the words dndAllows reads. A notification listener
+     * may; false without notification access.
      * Since Android 15 an app's switch is a mode of its own, which ends only its own Do Not Disturb: one the user turned
      * on stays, and [stays] runs, for Android's own settings.
      */
@@ -231,20 +232,25 @@ class Modes(
     ): Boolean {
         val listener = MediaListener.connected ?: return false
         val word = arg.toString()
-        if (arg !is Bool && (word == "priority" || word == "alarms")) prefs.edit().putString("dnd", word).apply()
+        val level = arg !is Bool && (word == "priority" || word == "alarms" || word == "none")
+        if (level) prefs.edit().putString("dnd", word).apply()
         val on =
             when {
                 arg is Bool -> arg.v
-                word == "on" || word == "priority" || word == "alarms" -> true
-                word == "off" -> false
+                word == "on" || level -> true
+                word == "off" || word == "all" -> false
                 word == "toggle" -> !dndOn()
                 else -> return true
             }
         val filter =
             when {
                 !on -> NotificationListenerService.INTERRUPTION_FILTER_ALL
-                prefs.getString("dnd", null) == "alarms" -> NotificationListenerService.INTERRUPTION_FILTER_ALARMS
-                else -> NotificationListenerService.INTERRUPTION_FILTER_PRIORITY
+                else ->
+                    when (prefs.getString("dnd", null)) {
+                        "alarms" -> NotificationListenerService.INTERRUPTION_FILTER_ALARMS
+                        "none" -> NotificationListenerService.INTERRUPTION_FILTER_NONE
+                        else -> NotificationListenerService.INTERRUPTION_FILTER_PRIORITY
+                    }
             }
         runCatching { listener.requestInterruptionFilter(filter) }.onFailure { Log.w("widgets", "dnd: ${it.message}") }
         // Android applies it at once, but says so through the listener's thread: a moment later, it's either off or stays.

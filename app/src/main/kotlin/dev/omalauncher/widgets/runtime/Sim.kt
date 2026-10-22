@@ -41,21 +41,22 @@ class Sim(
     @Volatile private var signal: Int? = null
 
     fun value(): Value {
-        val t = telephony ?: return Obj(mapOf("available" to bool(false), "present" to bool(false)))
-        val present = t.simState == TelephonyManager.SIM_STATE_READY
+        val t = telephony
+        // Every field on every phone, null where there's nothing to say, so a widget reads one shape.
+        val present = t != null && t.simState == TelephonyManager.SIM_STATE_READY
         // Without a SIM there's no network of its own, signal or data to speak of.
-        val carrier = if (present) t.networkOperatorName.ifBlank { t.simOperatorName }.takeIf { it.isNotBlank() } else null
-        val level = if (present) signal ?: runCatching { t.signalStrength?.level }.getOrNull() else null
+        val carrier = if (t != null && present) t.networkOperatorName.ifBlank { t.simOperatorName }.takeIf { it.isNotBlank() } else null
+        val level = if (t != null && present) signal ?: runCatching { t.signalStrength?.level }.getOrNull() else null
         val data = if (present) mobileData() else null
         return Obj(
             mapOf(
-                "available" to bool(true),
+                "available" to bool(t != null),
                 "present" to bool(present),
                 // The network it's on (another's name while roaming), else the SIM's own.
                 "carrier" to (carrier?.let(::Str) ?: Null),
                 "signal" to (level?.let { Num(it.toDouble()) } ?: Null),
                 "data" to (data?.let(::bool) ?: Null),
-                "roaming" to bool(present && runCatching { t.isNetworkRoaming }.getOrDefault(false)),
+                "roaming" to bool(t != null && present && runCatching { t.isNetworkRoaming }.getOrDefault(false)),
             ),
         )
     }

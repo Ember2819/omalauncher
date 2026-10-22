@@ -24,20 +24,26 @@ panel "controls" {
   state swiped = ""
   // The toggle whose popup a long-press opened: dnd lists its levels, torch has a brightness slider.
   state menu = ""
+  // When what "snooze 1h" snoozed comes back, for the header to say; unsnooze brings them back sooner.
+  state snoozedUntil = 0 persist
 
   let wide = screenWidth ?? 400
+  at snoozedUntil { snoozedUntil = 0 }
+  // Whole minutes, rounded up: now ticks every 30 s, so seconds would lag.
+  let snoozeLeft = ceil((snoozedUntil - now) / 60)
   // Only switches a tap flips right here. Android lets a launcher read wifi, bluetooth, airplane mode and the rest but
   // not switch them, and a tap that only opens Android's own panel for one isn't a switch.
   let toggles = [
       {name: "torch", on: m.torch == true, sub: m.torch == null ? "none" : (m.torch ? (m.torchLevel != null ? "${m.torchLevel}%" : "on") : "off"), act: m.torch == null ? null : "torch"},
-      {name: "dnd", on: m.dnd == true, sub: m.dndLevel, act: "dnd"},
+      {name: "dnd", on: m.dnd == true, sub: m.dndAllows == "all" ? "off" : (m.dndAllows == "none" ? "silence" : m.dndAllows), act: "dnd"},
       {name: "sound", on: !v.muted, sub: v.muted ? "muted" : "${v.level}%", act: "sound"}
     ]
-  // What long-pressing dnd offers. Total silence isn't one: it silences alarms too, and is Android's own to pick.
+  // What long-pressing dnd offers, by what android.modes' dndAllows says gets through; dnd(...) takes the same words.
   let dndLevels = [
-      {level: "off", name: "off", about: "everything gets through"},
+      {level: "all", name: "off", about: "everything gets through"},
       {level: "priority", name: "priority only", about: "only the calls, messages and apps your Do Not Disturb settings let through, and alarms"},
-      {level: "alarms", name: "alarms only", about: "alarms, and sound from what's playing; calls and messages stay quiet"}
+      {level: "alarms", name: "alarms only", about: "alarms, and sound from what's playing; calls and messages stay quiet"},
+      {level: "none", name: "total silence", about: "nothing, alarms included"}
     ]
   let clearable = count(n.items ?? [], i => i.clearable)
   // What's playing, as the now playing widget shows it: art, the app with a live equalizer and drawn buttons.
@@ -167,17 +173,15 @@ panel "controls" {
             align: top
             padding: [12, 8]
             onTap: { haptic(); menu = ""; dnd(l.level) }
-            Text { text: m.dndLevel == l.level ? "●" : "○"; color: m.dndLevel == l.level ? green : muted }
+            Text { text: m.dndAllows == l.level ? "●" : "○"; color: m.dndAllows == l.level ? green : muted }
             Column {
               gap: 2
               weight: 1
-              Text { text: l.name; color: m.dndLevel == l.level ? green : foreground }
+              Text { text: l.name; color: m.dndAllows == l.level ? green : foreground }
               Text { text: l.about; style: small; color: muted }
             }
           }
         }
-        // Set in Android itself: the panel can show it, and turn it off.
-        Text { visible: m.dndLevel == "silence"; text: "total silence is on, from Android's settings"; style: small; color: orange; padding: [12, 4, 12, 8] }
       }
       Row {
         fill: width
@@ -290,14 +294,28 @@ panel "controls" {
       Spacer { height: 1; fill: width; background: border }
       // Without access, notification(...) opens the setting that grants it.
       Text { text: "[ allow notification access ]"; color: accent; onTap: notification("open", "") }
-    } else if (n.count ?? 0) > 0 {
+    } else if (n.count ?? 0) > 0 || snoozedUntil > now {
       Spacer { height: 1; fill: width; background: border }
       Row {
         fill: width
         align: center
         Text { text: "notifications"; fontSize: 22; color: accent; weight: 1 }
-        // Hidden for an hour, then back: Android shows each again when its time is up.
-        Text { text: "[ snooze 1h ]"; color: clearable > 0 ? accent : muted; onTap: { if clearable > 0 { notification("snooze", 3600) } } }
+        // Hidden for an hour, then back: Android shows each again when its time is up. One that comes in meanwhile shows.
+        if snoozedUntil > now {
+          Text { text: "back in " + (snoozeLeft >= 60 ? "1h" : "${snoozeLeft}m") + " "; color: muted }
+          Text { text: "[ unsnooze ]"; color: accent; onTap: { haptic(); notification("unsnoozeAll"); snoozedUntil = 0 } }
+        } else {
+          Text {
+            text: "[ snooze 1h ]"
+            color: clearable > 0 ? accent : muted
+            onTap: {
+              if clearable > 0 {
+                notification("snoozeAll", 3600)
+                snoozedUntil = now + 3600
+              }
+            }
+          }
+        }
       }
     }
 

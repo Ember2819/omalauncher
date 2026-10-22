@@ -142,7 +142,7 @@ internal val SINCE =
         mapOf("android.network" to 13) +
         // owl 13: the SIM and its signal; Do Not Disturb switched and notifications snoozed through notification access;
         // offsets that ease back when a drag lets go; the torch dimmed.
-        listOf("android.sim", "dnd", "notification(\"snooze\")", ANIMATE_OFFSET, TORCH_LEVEL).associateWith { 13 }
+        listOf("android.sim", "dnd", "notification(\"snooze\")", "notification(\"snoozeAll\")", "notification(\"unsnooze\")", "notification(\"unsnoozeAll\")", ANIMATE_OFFSET, TORCH_LEVEL).associateWith { 13 }
 
 /** `animate offset: ...`, named like this in [SINCE]. */
 internal const val ANIMATE_OFFSET = "animate offset"
@@ -253,11 +253,12 @@ internal val ACTION_WORDS =
         // true and false also turn it on and off.
         // A number turns it on at that brightness, in percent.
         "torch" to setOf("on", "off", "toggle").let { Words(it, "torch takes a brightness in percent, true, false, ${it.joinToString()}", numbers = true) },
-        "dnd" to setOf("on", "off", "toggle", "priority", "alarms").let { Words(it, "dnd takes true, false, ${it.joinToString()}") },
+        // Besides on, off and toggle, what android.modes' dndAllows says, so dnd(m.dndAllows) sets back what it read.
+        "dnd" to setOf("on", "off", "toggle", "all", "priority", "alarms", "none").let { Words(it, "dnd takes true, false, ${it.joinToString()}") },
         "notification" to
             Words(
-                setOf("open", "dismiss", "clear", "action", "reply", "snooze"),
-                "notification takes open, dismiss, clear, action, reply or snooze",
+                setOf("open", "dismiss", "clear", "action", "reply", "snooze", "snoozeAll", "unsnooze", "unsnoozeAll"),
+                "notification takes open, dismiss, clear, action, reply, snooze, snoozeAll, unsnooze or unsnoozeAll",
                 forms =
                     mapOf(
                         "open" to (2..2 to "notification(\"open\", key)"),
@@ -265,7 +266,10 @@ internal val ACTION_WORDS =
                         "clear" to (1..1 to "notification(\"clear\")"),
                         "action" to (3..3 to "notification(\"action\", key, i)"),
                         "reply" to (3..3 to "notification(\"reply\", key, text)"),
-                        "snooze" to (2..3 to "notification(\"snooze\", key, seconds), or notification(\"snooze\", seconds) for all of them"),
+                        "snooze" to (3..3 to "notification(\"snooze\", key, seconds)"),
+                        "snoozeAll" to (2..2 to "notification(\"snoozeAll\", seconds)"),
+                        "unsnooze" to (2..2 to "notification(\"unsnooze\", key)"),
+                        "unsnoozeAll" to (1..1 to "notification(\"unsnoozeAll\")"),
                     ),
             ),
         // Android's panel (a sheet over home) where it has one, else its settings screen.

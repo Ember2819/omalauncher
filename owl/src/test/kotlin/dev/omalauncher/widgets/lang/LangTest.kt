@@ -1323,13 +1323,15 @@ class LangTest {
         Compiler.compile(
             "widget {\n meta { owl: 13 }\n source s = android.sim\n state x = 0\n" +
                 " Box { offset: [x, 0]; animate offset: spring(0.8, 400); drag: horizontal; onDrag: x = x + dx; onDragEnd: x = 0\n" +
-                "  Text { text: s.carrier ?? \"no sim\"; onTap: { dnd(\"toggle\"); dnd(true); dnd(\"alarms\"); dnd(\"priority\"); torch(40); torch(\"60\"); notification(\"snooze\", 3600); notification(\"snooze\", \"k\", 600) } } } }",
+                "  Text { text: s.carrier ?? \"no sim\"; onTap: { dnd(\"toggle\"); dnd(true); dnd(\"alarms\"); dnd(\"priority\"); dnd(\"none\"); dnd(\"all\"); torch(40); torch(\"60\"); notification(\"snoozeAll\", 3600); notification(\"snooze\", \"k\", 600); notification(\"unsnooze\", \"k\"); notification(\"unsnoozeAll\") } } } }",
         )
-        for (old in listOf("source s = android.sim\n Text { text: 1 }", "Text { text: 1; onTap: dnd(\"on\") }", "Text { text: 1; onTap: notification(\"snooze\", 60) }", "Box { offset: [1, 0]; animate offset: spring() }", "Text { text: 1; onTap: torch(40) }")) {
+        for (old in listOf("source s = android.sim\n Text { text: 1 }", "Text { text: 1; onTap: dnd(\"on\") }", "Text { text: 1; onTap: notification(\"snoozeAll\", 60) }", "Text { text: 1; onTap: notification(\"snooze\", \"k\", 60) }", "Text { text: 1; onTap: notification(\"unsnoozeAll\") }", "Box { offset: [1, 0]; animate offset: spring() }", "Text { text: 1; onTap: torch(40) }")) {
             compileError("widget {\n meta { owl: 12 }\n $old }").let { assertTrue(it, it.contains("needs owl 13")) }
         }
         assertTrue(compileError("widget {\n meta { owl: 13 }\n Text { text: 1; onTap: dnd(\"silence\") } }").contains("dnd takes"))
-        compileError("widget {\n meta { owl: 13 }\n Text { text: 1; onTap: notification(\"snooze\") } }").let { assertTrue(it, it.contains("notification(\"snooze\", seconds)")) }
+        // A forgotten length is caught, not a snooze that silently does nothing.
+        compileError("widget {\n meta { owl: 13 }\n Text { text: 1; onTap: notification(\"snooze\", \"k\") } }").let { assertTrue(it, it.contains("notification(\"snooze\", key, seconds)")) }
+        compileError("widget {\n meta { owl: 13 }\n Text { text: 1; onTap: notification(\"snoozeAll\") } }").let { assertTrue(it, it.contains("notification(\"snoozeAll\", seconds)")) }
     }
 
     @Test fun sliderAndInput() {

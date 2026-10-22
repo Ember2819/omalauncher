@@ -100,8 +100,9 @@ class Notifications(
     /**
      * "open" runs the notification's tap action and "dismiss" clears it; "clear" clears every one that can be, as the
      * shade's Clear all does. "action" presses the [arg]-th of its buttons, and "reply" sends [arg] as typed text through
-     * the one that takes it. "snooze" hides it for [arg] seconds, after which Android shows it again; with a number for
-     * [key] and no [arg], every one that can be cleared. Without access, opens the setting that grants it.
+     * the one that takes it. "snooze" hides it for [arg] seconds, after which Android shows it again; "snoozeAll" every
+     * one that can be cleared, for [key] seconds. "unsnooze" brings a snoozed one back now, "unsnoozeAll" every one,
+     * the shade's snoozes too. Without access, opens the setting that grants it.
      */
     fun control(
         command: String,
@@ -111,10 +112,16 @@ class Notifications(
         val listener = MediaListener.connected
         if (!media.granted || listener == null) return media.openAccessSettings()
         if (command == "clear") return listener.cancelAllNotifications()
-        // Without a key, every one that can be cleared, for "mute 1h": each comes back when its time is up.
-        if (command == "snooze" && arg == null) {
+        // Every one that can be cleared, for "mute 1h": each comes back when its time is up. The seconds come in key's place.
+        if (command == "snoozeAll") {
             val ms = snoozeMs(key?.toDoubleOrNull()) ?: return
             for (sbn in shown()) if (sbn.isClearable) runCatching { listener.snoozeNotification(sbn.key, ms) }
+            return
+        }
+        // Android has no unsnooze for apps, but snoozing a snoozed one again replaces its time: a moment, and it's back.
+        if (command == "unsnooze" || command == "unsnoozeAll") {
+            val snoozed = runCatching { listener.snoozedNotifications }.getOrNull().orEmpty()
+            for (sbn in snoozed) if (command == "unsnoozeAll" || sbn.key == key) runCatching { listener.snoozeNotification(sbn.key, UNSNOOZE_MS) }
             return
         }
         val sbn = key?.let { runCatching { listener.getActiveNotifications(arrayOf(it)) }.getOrNull()?.firstOrNull() } ?: return
@@ -139,6 +146,9 @@ class Notifications(
             }
         }
     }
+
+    /** How long an unsnoozed notification stays away: the shortest snooze that still reliably ends. */
+    private val UNSNOOZE_MS = 1000L
 
     /** A snooze of [seconds], from a minute to a week; null for none. */
     private fun snoozeMs(seconds: Double?) = seconds?.takeIf { it > 0 }?.coerceIn(60.0, 7 * 24 * 3600.0)?.let { (it * 1000).toLong() }
