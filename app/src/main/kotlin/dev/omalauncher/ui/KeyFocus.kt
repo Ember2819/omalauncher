@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.inset
 import androidx.compose.ui.node.DelegatableNode
 import androidx.compose.ui.node.DrawModifierNode
 import androidx.compose.ui.node.invalidateDraw
@@ -55,6 +56,16 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.toSize
 
 /**
  * What a focused node holds of a key on it: whether its press was seen here, and whether holding it long-pressed. And
@@ -276,6 +287,57 @@ fun Modifier.keyStepped(
         .drawWithContent {
             drawContent()
             if (focused) drawKeyFocus()
+        }
+}
+
+/**
+ * Long text keys read through, like a license or a file: it takes focus once keys are in use, ringed while it has it,
+ * and while some of it is out of sight the arrows that way bring the next of it into view, Page Up and Page Down a
+ * screenful, rather than moving on. Once it's all shown that way, they move focus on. Whatever it's in scrolls, so
+ * after a horizontalScroll of its own, Left and Right read across too. Bare text has its ring [around] it, clear of
+ * the letters.
+ */
+@Composable
+fun Modifier.keyScrolled(around: Boolean = false): Modifier {
+    val inputMode = LocalInputModeManager.current
+    val scope = rememberCoroutineScope()
+    val requester = remember { BringIntoViewRequester() }
+    val step = with(LocalDensity.current) { 48.dp.toPx() }
+    var focused by remember { mutableStateOf(false) }
+    val laid = remember { arrayOfNulls<LayoutCoordinates>(1) }
+    return this
+        .bringIntoViewRequester(requester)
+        .onGloballyPositioned { laid[0] = it }
+        .focusProperties { canFocus = inputMode.inputMode == InputMode.Keyboard }
+        .onFocusChanged { focused = it.isFocused }
+        .onKeyEvent { e ->
+            if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
+            val at = laid[0]?.takeIf { it.isAttached } ?: return@onKeyEvent false
+            // What shows of it, in its own coordinates: its bounds in the window are cut to what it's in.
+            val seen = at.boundsInWindow().translate(-at.positionInWindow())
+            if (seen.isEmpty) return@onKeyEvent false
+            val page = (seen.height - step).coerceAtLeast(step)
+            val next =
+                when (e.key) {
+                    Key.DirectionDown -> Rect(seen.left, seen.bottom, seen.right, seen.bottom + step)
+                    Key.DirectionUp -> Rect(seen.left, seen.top - step, seen.right, seen.top)
+                    Key.PageDown -> Rect(seen.left, seen.bottom, seen.right, seen.bottom + page)
+                    Key.PageUp -> Rect(seen.left, seen.top - page, seen.right, seen.top)
+                    Key.DirectionRight -> Rect(seen.right, seen.top, seen.right + step, seen.bottom)
+                    Key.DirectionLeft -> Rect(seen.left - step, seen.top, seen.left, seen.bottom)
+                    else -> return@onKeyEvent false
+                }.intersect(Rect(Offset.Zero, at.size.toSize()))
+            // Less than a pixel left that way: it's all been shown.
+            if (next.width < 1f || next.height < 1f) return@onKeyEvent false
+            scope.launch { requester.bringIntoView(next) }
+            true
+        }.focusable()
+        .drawWithContent {
+            drawContent()
+            if (focused) {
+                val out = if (around) -6.dp.toPx() else 0f
+                inset(out) { drawKeyFocus() }
+            }
         }
 }
 

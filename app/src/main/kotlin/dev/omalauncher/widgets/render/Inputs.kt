@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.sp
 import dev.omalauncher.ui.LauncherStyle
 import dev.omalauncher.ui.Palette
 import dev.omalauncher.ui.TileField
+import dev.omalauncher.ui.keyStepped
 import dev.omalauncher.ui.leavesUpDown
 import dev.omalauncher.widgets.lang.Null
 import dev.omalauncher.widgets.lang.Num
@@ -103,7 +104,22 @@ internal fun SliderNode(
             // A weight or width only sizes it across; it keeps its height unless given one.
             .then(if (sized) Modifier else Modifier.fillMaxWidth())
             .then(if (p.has("height") || p.has("size") || p.has("fill")) Modifier else Modifier.height(28.dp))
-            .pointerInput(p.el, p.env, min, max, step) {
+            // Keys step it by its step, else a twentieth of its range or with Shift a hundredth, sending each one: a
+            // key has no lift to wait for. At either end the arrow moves on.
+            .then(
+                if (onChange == null) {
+                    Modifier
+                } else {
+                    Modifier.keyStepped(vertical = false) { by, fine ->
+                        val from = held ?: value ?: min
+                        val to = (from + by * (step ?: ((max - min) / if (fine) 100 else 20))).coerceIn(min, max)
+                        if (to == from) return@keyStepped false
+                        held = to
+                        send(to)
+                        true
+                    }
+                },
+            ).pointerInput(p.el, p.env, min, max, step) {
                 detectTapGestures { o ->
                     sent[0] = null
                     held = at(o.x, size.width).also(::send)

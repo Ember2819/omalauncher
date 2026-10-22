@@ -492,7 +492,8 @@ private fun Screens(
 ) {
     // Until one has loaded, a slot is phone-shaped.
     val ratio = preview?.let { it.width.toFloat() / it.height } ?: PHONE_RATIO
-    val shot = Modifier.height(ScreenHeight).aspectRatio(ratio).frame(1.dp, Palette.border, radius = 8.dp).clip(RoundedCornerShape(8.dp))
+    // Keys stop at each, so the arrows go through them, the row scrolling to follow.
+    val shot = Modifier.height(ScreenHeight).aspectRatio(ratio).frame(1.dp, Palette.border, radius = 8.dp).clip(RoundedCornerShape(8.dp)).keyScrolled()
     LazyRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         item(key = "preview") { Box(shot.background(Palette.surface)) { preview?.let { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Fit) } } }
         items(screens, key = { it }) { path ->
@@ -624,8 +625,11 @@ internal fun InstallDisclosure(
     notice: @Composable () -> Unit = {},
 ) {
     val packages = requires.entries.joinToString("; ") { (m, l) -> "$m: ${l.joinToString(", ")}" }.ifEmpty { "none" }
-    BasicText("installs packages: $packages", style = Mono.copy(fontSize = TextSize.Small))
-    notice()
-    BasicText(if (commands.isEmpty()) "runs no commands" else "runs these commands in Arch:", style = Mono.copy(fontSize = TextSize.Small))
+    // A stop for keys, at the end of a page that may have nothing else to scroll it there.
+    Column(Modifier.keyScrolled(around = true), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        BasicText("installs packages: $packages", style = Mono.copy(fontSize = TextSize.Small))
+        notice()
+        BasicText(if (commands.isEmpty()) "runs no commands" else "runs these commands in Arch:", style = Mono.copy(fontSize = TextSize.Small))
+    }
     for (c in commands) CodeBlock(c.trimEnd())
 }

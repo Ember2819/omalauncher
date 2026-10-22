@@ -216,10 +216,10 @@ fun Modifier.card(
         .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
         .padding(padding)
 
-/** Commands or a widget's source, small, scrolling sideways rather than wrapping. */
+/** Commands or a widget's source, small, scrolling sideways rather than wrapping. Keys read through it every way. */
 @Composable
 fun CodeBlock(text: String) =
-    BasicText(text, Modifier.fillMaxWidth().background(Palette.surface).horizontalScroll(rememberScrollState()).padding(6.dp), style = Mono.copy(fontSize = TextSize.Small))
+    BasicText(text, Modifier.fillMaxWidth().background(Palette.surface).horizontalScroll(rememberScrollState()).keyScrolled().padding(6.dp), style = Mono.copy(fontSize = TextSize.Small))
 
 /**
  * A framed popup list at [position] with [selected] marked; picking one closes it first.

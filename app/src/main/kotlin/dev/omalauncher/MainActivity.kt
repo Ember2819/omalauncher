@@ -23,6 +23,7 @@ import dev.omalauncher.theme.Style
 import dev.omalauncher.ui.KeyIndicated
 import dev.omalauncher.ui.keysStartAgain
 import dev.omalauncher.ui.movesFocus
+import dev.omalauncher.ui.panelOf
 import dev.omalauncher.ui.LauncherStyle
 import dev.omalauncher.ui.SystemBarsEffect
 import dev.omalauncher.ui.applySystemBars
@@ -170,6 +171,12 @@ class MainActivity : ComponentActivity() {
         runtime.screenStarted()
     }
 
+    /** A terminal tile's keys held as home goes, like Super, would stay down for it: Android sends their lift elsewhere. */
+    override fun onPause() {
+        super.onPause()
+        runtime.keyboard.releaseHeld()
+    }
+
     override fun onStop() {
         super.onStop()
         away = true
@@ -182,8 +189,17 @@ class MainActivity : ComponentActivity() {
 
     private fun shortcut(keyCode: Int): Boolean {
         when (keyCode) {
+            // Lets go of the terminal tile that has the keys, as Back or a tap outside does, where Esc itself is its own.
+            KeyEvent.KEYCODE_ESCAPE -> if (runtime.terminals.active != null) runtime.terminals.deactivate() else return false
             KeyEvent.KEYCODE_ENTER -> runtime.terminal(null, "Terminal")
             KeyEvent.KEYCODE_SPACE -> state.toggle()
+            // The panel swiping down opens, and closed again: it comes from above, as the drawer from the bar.
+            KeyEvent.KEYCODE_DPAD_DOWN ->
+                if (state.pulled != null) {
+                    state.closePull()
+                } else {
+                    state.openPull(runtime.panelOf(runtime.gestures.swipeDown) ?: return false)
+                }
             KeyEvent.KEYCODE_A -> state.promptRequest = PromptRequest.Type
             in KeyEvent.KEYCODE_1..KeyEvent.KEYCODE_9 -> state.requestedPage = keyCode - KeyEvent.KEYCODE_0
             else -> return false

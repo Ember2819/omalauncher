@@ -21,9 +21,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.pointer.pointerInput
@@ -119,7 +121,11 @@ class TerminalTiles(
     }
 
     fun deactivate() {
-        if (active != null) wm.focus(null)
+        if (active != null) {
+            // Keys still down, like the Super of Super+Esc, would stay held for the terminal.
+            runtime.keyboard.releaseHeld()
+            wm.focus(null)
+        }
         tile = null
         keyboard?.hide()
         field?.release()
@@ -298,6 +304,7 @@ fun TerminalView(
                 Box(
                     Modifier
                         .fillMaxSize()
+                        .keyTapped { term.start() }
                         .pointerInput(term) { detectTapGestures { term.start() } },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -318,8 +325,21 @@ fun TerminalView(
                     BasicText("⌨", style = Mono.copy(color = Palette.foreground))
                 }
             }
-            interactive -> Box(Modifier.fillMaxSize().pointerInput(term) { detectTapGestures { tiles.activate(term) } })
+            interactive -> Box(Modifier.fillMaxSize().keyTapped { tiles.activate(term) }.pointerInput(term) { detectTapGestures { tiles.activate(term) } })
         }
+    }
+}
+
+/**
+ * Keys reach the terminal inside its tile (Enter on the tile, or Right), ringed: Enter there types into it, as a tap
+ * does, or restarts it once it has exited.
+ */
+@Composable
+private fun Modifier.keyTapped(onTap: () -> Unit): Modifier {
+    var focused by remember { mutableStateOf(false) }
+    return keyActivated(onTap, null) { focused = it.isFocused }.drawWithContent {
+        drawContent()
+        if (focused) drawKeyFocus()
     }
 }
 

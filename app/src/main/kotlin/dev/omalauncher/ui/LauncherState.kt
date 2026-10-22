@@ -181,6 +181,14 @@ class LauncherState {
         if (open) composeScope?.launch { pull.animateTo(1f, spring(stiffness = Spring.StiffnessMediumLow)) } else closePull()
     }
 
+    /** Brings [name] down as the swipe-down panel, as a key asks for it rather than a drag; the drawer goes. */
+    fun openPull(name: String) {
+        val compose = composeScope ?: return
+        close()
+        pulled = name
+        compose.launch { pull.animateTo(1f, spring(stiffness = Spring.StiffnessMediumLow)) }
+    }
+
     /** Slides the panel away and lets it go; a drag that catches it on the way keeps it. */
     fun closePull() {
         // Read once: composition can start between launching and running, and animating outside it has no frame clock.

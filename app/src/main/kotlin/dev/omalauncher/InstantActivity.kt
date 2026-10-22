@@ -27,6 +27,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.toArgb
 import dev.omalauncher.ui.Palette
+import java.util.Collections
+import java.util.WeakHashMap
 
 /**
  * The launcher's own screens with their own task (settings, Files, the editor, Linux
@@ -137,7 +139,17 @@ abstract class InstantActivity : ComponentActivity() {
  * matter (the emulator's keyboard can report it held); Ctrl, Alt or Super make it another shortcut.
  */
 internal fun ComponentActivity.escapeAsBack(event: KeyEvent): Boolean {
-    if (event.keyCode != KeyEvent.KEYCODE_ESCAPE || event.isCtrlPressed || event.isAltPressed || event.isMetaPressed) return false
-    if (event.action == KeyEvent.ACTION_UP) onBackPressedDispatcher.onBackPressed()
+    if (event.keyCode != KeyEvent.KEYCODE_ESCAPE) return false
+    // Only a press seen here: the Esc of Super+Esc, which left another window, lifts in this one.
+    if (event.action == KeyEvent.ACTION_DOWN) {
+        if (event.isCtrlPressed || event.isAltPressed || event.isMetaPressed) return false
+        escapesDown += this
+        return true
+    }
+    if (!escapesDown.remove(this)) return false
+    if (!event.isCanceled) onBackPressedDispatcher.onBackPressed()
     return true
 }
+
+/** The activities an Esc went down in that hasn't lifted yet. */
+private val escapesDown = Collections.newSetFromMap(WeakHashMap<ComponentActivity, Boolean>())
