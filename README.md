@@ -64,7 +64,9 @@ Enter on a terminal tile goes into it, and Enter there types into it, or
 restarts it once it has exited. Esc (B) closes the drawer, a panel or a
 widget's screen, like Back. Long text, like a license or a file being
 shared, takes the arrows until it has all been shown, Page Up and Page Down a
-screenful.
+screenful. On the pages screen, Enter picks a page up by its ≡ and the arrows
+move it, until Enter or Esc puts it down. Menu on a notification in the
+swipe-down panel dismisses it.
 
 ## Building
 

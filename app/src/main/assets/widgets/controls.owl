@@ -344,12 +344,18 @@ panel "controls" {
           dragging = ""
           dragX = 0
         }
-        // Tapped anywhere it opens, and keys stop on it once.
+        // Tapped anywhere it opens, and keys stop on it once. Held, or Menu on it, dismisses it, as a swipe does.
         Row {
           fill: width
           gap: 10
           align: top
           onTap: notification("open", item.key)
+          onLongPress: {
+            if item.clearable {
+              swiped = item.key
+              notification("dismiss", item.key)
+            }
+          }
           Text { text: lower(item.app); color: muted; width: 84; maxLines: 1 }
           Text {
             spans: [{text: item.title, color: foreground}, item.text != "" ? "  " : "", {text: item.text, color: muted}]

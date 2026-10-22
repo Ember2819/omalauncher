@@ -199,7 +199,8 @@ private fun StartButton(
     onStart: () -> Unit,
 ) {
     Column {
-        PrimaryButton(if (linux) "start and set up linux" else "start", onStart)
+        // Keys on it wait out the theme's download, for try again should it fail.
+        PrimaryButton(if (linux) "start and set up linux" else "start", Modifier.passesKeys(), onStart)
         BasicText(
             if (linux) {
                 "Linux downloads about 1 GB, so Wi-Fi is best, and takes 3 GB of space. It installs in the " +
@@ -235,7 +236,7 @@ private fun ThemeDownloadProgress(
     )
     if (error != null) {
         Spacer(Modifier.height(28.dp))
-        PrimaryButton("try again", onRetry)
+        PrimaryButton("try again", Modifier.takesPassedKeys().passesKeys(), onRetry)
         BasicText(
             "continue without wallpapers",
             Modifier.padding(top = 16.dp).clickable(onClick = onSkip),
@@ -289,10 +290,11 @@ private fun Check(on: Boolean) {
 @Composable
 internal fun PrimaryButton(
     label: String,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     Box(
-        Modifier
+        modifier
             .fillMaxWidth()
             .frame(0.dp, Palette.accent, Palette.accent, radius = 14.dp)
             .clickable(onClick = onClick)
@@ -341,11 +343,11 @@ internal fun LinuxProgress(
     }
     Spacer(Modifier.height(24.dp))
     if (failed != null) {
-        PrimaryButton("try again", onRetry)
+        PrimaryButton("try again", Modifier.takesPassedKeys().passesKeys(), onRetry)
         Spacer(Modifier.height(16.dp))
     }
     if (onCancel != null) {
-        BracketAction("cancel install", Palette.red, onCancel)
+        BracketAction("cancel install", Palette.red, Modifier.takesPassedKeys().passesKeys(), onCancel)
         Spacer(Modifier.height(16.dp))
     }
     LogTail(log, expandedByDefault = failed != null)

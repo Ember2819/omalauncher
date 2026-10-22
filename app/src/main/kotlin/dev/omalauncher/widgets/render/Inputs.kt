@@ -30,6 +30,8 @@ import androidx.compose.ui.graphics.ColorProducer
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalInputModeManager
+import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
@@ -181,6 +183,7 @@ internal fun InputNode(
     val onChange = p.el.handlers["onChange"]
     val onSubmit = p.el.handlers["onSubmit"]
     val focus = LocalFocusManager.current
+    val inputMode = LocalInputModeManager.current
     val want = LocalInputFocus.current && p.observe("focus")?.truthy == true
     val requester = remember { FocusRequester() }
     LaunchedEffect(want) { if (want) requester.requestFocus() }
@@ -228,7 +231,8 @@ internal fun InputNode(
             KeyboardActions(onAny = {
                 onSubmit?.run(p.env, listOf(Str(field.text)))
                 if (clear) edit(TextFieldValue(""))
-                focus.clearFocus()
+                // Typed on a keyboard, the keys stay here, as on a soft keyboard Done puts it away.
+                if (inputMode.inputMode != InputMode.Keyboard) focus.clearFocus()
             }),
         decorationBox = { inner ->
             Box(Modifier.padding(vertical = 6.dp)) {

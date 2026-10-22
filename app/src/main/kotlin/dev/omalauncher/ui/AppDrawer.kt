@@ -314,6 +314,7 @@ private fun StripCell(
             .size(48.dp)
             .alpha(if (paused) PausedAlpha else 1f)
             .clip(LauncherStyle.shape(12.dp))
+            .menuLongPresses { menuOpen = true }
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = {

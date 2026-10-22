@@ -392,7 +392,8 @@ fun HomeScreen(
                 var keyed by remember(item.key) { mutableStateOf(false) }
                 val inside = remember(item.key) { FocusRequester() }
                 val keyOpen: () -> Unit = if (item is WidgetItem && item.spec.program?.onTap == null) { { inside.requestFocus() } } else open
-                val tile = placed.keyActivated(keyOpen, { state.editing = item.key }, inside) { keyed = it.hasFocus }
+                // Keys on a tile as it's removed, or as its page goes, go to the first tile of the page that shows.
+                val tile = placed.passesKeys(state.homeEntry).keyActivated(keyOpen, { state.editing = item.key }, inside) { keyed = it.hasFocus }
                 val highlighted = selected || keyed
                 when (item) {
                     is WidgetItem -> {
@@ -521,8 +522,8 @@ private fun FaceInvite(
             )
             // Pulled left by the buttons' own padding, so the first bracket lines up with the text.
             Column(Modifier.offset(x = (-8).dp)) {
-                BracketAction("create with ${agent?.lowercase() ?: "an agent"}", Palette.accent, onCreate)
-                BracketAction("browse store", Palette.accent, onBrowse)
+                BracketAction("create with ${agent?.lowercase() ?: "an agent"}", Palette.accent, onClick = onCreate)
+                BracketAction("browse store", Palette.accent, onClick = onBrowse)
             }
         }
     }

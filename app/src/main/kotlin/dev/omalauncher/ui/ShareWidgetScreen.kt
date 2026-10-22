@@ -27,6 +27,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -91,6 +93,8 @@ fun ShareWidgetScreen(
     var copied by remember(file) { mutableStateOf(false) }
     var showSource by remember(file) { mutableStateOf(false) }
 
+    // Keys on get QR code go on to share it, which takes its place once it's uploaded.
+    val shareCode = remember { FocusRequester() }
     OverlayPanel("share $name", onDismiss, contentWidth = ReadingWidth) {
         val prepared = prepared ?: return@OverlayPanel
         val text = prepared.text
@@ -102,7 +106,7 @@ fun ShareWidgetScreen(
                 FlowRow {
                     BracketAction(if (showSource) "hide the file" else "show the whole file", Palette.accent) { showSource = !showSource }
                     // The agent's check comes with your own look, not in place of it.
-                    if (showSource) BracketAction("check for secrets with agent", Palette.accent, onCheck)
+                    if (showSource) BracketAction("check for secrets with agent", Palette.accent, onClick = onCheck)
                 }
                 if (showSource) {
                     CodeBlock(text)
@@ -129,7 +133,7 @@ fun ShareWidgetScreen(
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.spacedBy(2.dp),
                                 ) {
-                                    BracketAction(if (uploading) "uploading…" else "get QR code", Palette.accent) {
+                                    BracketAction(if (uploading) "uploading…" else "get QR code", Palette.accent, Modifier.passesKeys(shareCode)) {
                                         if (uploading) return@BracketAction
                                         uploading = true
                                         uploadError = null
@@ -159,7 +163,7 @@ fun ShareWidgetScreen(
                     )
                     FlowRow {
                         if (code != null) {
-                            BracketAction("share QR code", Palette.accent) {
+                            BracketAction("share QR code", Palette.accent, Modifier.focusRequester(shareCode)) {
                                 scope.launch {
                                     val uri = withContext(Dispatchers.IO) { qrImage(context, code, Submit.slug(name)) }
                                     val send =
@@ -199,7 +203,7 @@ fun ShareWidgetScreen(
                 )
                 if (text != null) StoreIssue(spec, text)
                 BasicText("Or a pull request from your agent, which can add a preview too:", style = Mono.copy(color = Palette.muted, fontSize = TextSize.Small))
-                BracketAction("create pull request with agent", Palette.accent, onPublish)
+                BracketAction("create pull request with agent", Palette.accent, onClick = onPublish)
             }
         }
     }

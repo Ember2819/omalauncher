@@ -21,6 +21,7 @@ import androidx.compose.runtime.snapshotFlow
 import dev.omalauncher.ui.Palette
 import dev.omalauncher.theme.Style
 import dev.omalauncher.ui.KeyIndicated
+import dev.omalauncher.ui.keyPressed
 import dev.omalauncher.ui.keysStartAgain
 import dev.omalauncher.ui.movesFocus
 import dev.omalauncher.ui.panelOf
@@ -154,6 +155,7 @@ class MainActivity : ComponentActivity() {
      */
     @SuppressLint("RestrictedApi")
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.action == KeyEvent.ACTION_DOWN) keyPressed(window.decorView)
         if (event.isMetaPressed && event.action == KeyEvent.ACTION_DOWN && shortcut(event.keyCode)) return true
         if (event.keyCode != KeyEvent.KEYCODE_BACK && runtime.terminals.active != null && runtime.keyboard.handle(event)) return true
         // Nothing in the window has the keys (yet, or since a tap), so an arrow has nowhere to move from: it starts in the

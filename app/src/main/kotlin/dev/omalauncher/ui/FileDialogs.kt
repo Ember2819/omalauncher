@@ -104,7 +104,7 @@ internal fun TextDialog(
                     .padding(horizontal = 14.dp, vertical = 12.dp),
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            BracketAction("cancel", Palette.muted, onDismiss)
+            BracketAction("cancel", Palette.muted, onClick = onDismiss)
             BracketAction(confirm, Palette.accent) { if (text.isNotBlank()) onConfirm(text.trim()) }
         }
     }
@@ -124,8 +124,8 @@ internal fun ConfirmDialog(
         BasicText(title, style = Mono.copy(fontSize = TextSize.Title))
         BasicText(message, style = Mono.copy(color = Palette.muted))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            BracketAction("cancel", Palette.muted, onDismiss)
-            BracketAction(confirm, confirmColor, onConfirm)
+            BracketAction("cancel", Palette.muted, onClick = onDismiss)
+            BracketAction(confirm, confirmColor, onClick = onConfirm)
         }
     }
 }

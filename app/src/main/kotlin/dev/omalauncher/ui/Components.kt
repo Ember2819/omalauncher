@@ -294,9 +294,10 @@ fun Symbol(
 fun BracketAction(
     label: String,
     color: Color,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    Box(Modifier.clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = 6.dp)) {
+    Box(modifier.clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = 6.dp)) {
         BasicText("[ $label ]", style = Mono.copy(color = color))
     }
 }

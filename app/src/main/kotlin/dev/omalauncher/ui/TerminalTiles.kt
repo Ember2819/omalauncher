@@ -23,6 +23,9 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
@@ -292,6 +295,16 @@ fun TerminalView(
     val window = term.window
     val active = tiles.active === term
     LaunchedEffect(term) { term.start() }
+    // Keys that went into the terminal come back out to it as it lets the keyboard go, rather than to wherever
+    // Android gives the window's focus.
+    val back = remember { FocusRequester() }
+    var keysIn by remember { mutableStateOf(false) }
+    LaunchedEffect(active) {
+        if (active || !keysIn) return@LaunchedEffect
+        keysIn = false
+        withFrameNanos {}
+        back.requestFocus()
+    }
     Box(modifier.onGloballyPositioned { term.bounds = it.boundsInWindow().translate(0f, tiles.lift) }) {
         AndroidView(
             factory = { EmbeddedWindowView(it, tiles) },
@@ -325,7 +338,16 @@ fun TerminalView(
                     BasicText("⌨", style = Mono.copy(color = Palette.foreground))
                 }
             }
-            interactive -> Box(Modifier.fillMaxSize().keyTapped { tiles.activate(term) }.pointerInput(term) { detectTapGestures { tiles.activate(term) } })
+            interactive ->
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .focusRequester(back)
+                        .keyTapped {
+                            keysIn = true
+                            tiles.activate(term)
+                        }.pointerInput(term) { detectTapGestures { tiles.activate(term) } },
+                )
         }
     }
 }

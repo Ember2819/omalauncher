@@ -1,5 +1,6 @@
 package dev.omalauncher.ui
 
+import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.View
 import androidx.compose.foundation.IndicationNodeFactory
@@ -39,6 +40,8 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.FocusRequesterModifierNode
+import androidx.compose.ui.focus.requestFocus
 import androidx.compose.ui.focus.FocusState
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -79,7 +82,7 @@ private class KeyHold {
 }
 
 /** Keys that tap a focused node: a gamepad's A comes as itself, or as the D-pad's center where nothing takes it. */
-private val activateKeys = setOf(Key.Enter, Key.NumPadEnter, Key.DirectionCenter, Key.Spacebar, Key.ButtonA)
+internal val activateKeys = setOf(Key.Enter, Key.NumPadEnter, Key.DirectionCenter, Key.Spacebar, Key.ButtonA)
 
 /**
  * Lets a keyboard or a gamepad reach something that takes taps: it takes focus once keys are in use (not while
@@ -103,11 +106,13 @@ fun Modifier.keyActivated(
     val ltr = LocalLayoutDirection.current == LayoutDirection.Ltr
     val hold = remember { KeyHold() }
     val self = remember { FocusRequester() }
+    val refocus = remember { { self.requestFocus() } }
     return this
         .focusProperties { canFocus = inputMode.inputMode == InputMode.Keyboard }
         .onFocusChanged {
             if (!it.isFocused) hold.down = false
             hold.self = it.isFocused
+            if (it.isFocused) lastFocused = java.lang.ref.WeakReference(refocus)
             hold.within = it.hasFocus
             onFocus(it)
         }.onKeyEvent { e ->
@@ -155,6 +160,17 @@ fun Modifier.keyActivated(
 }
 
 /**
+ * Menu (a gamepad's Select) long-presses a combinedClickable, as it does what [keyActivated] makes take keys: Compose's
+ * own only long-presses as Enter is held.
+ */
+fun Modifier.menuLongPresses(onLongPress: () -> Unit): Modifier =
+    onKeyEvent { e ->
+        if (e.key != Key.Menu) return@onKeyEvent false
+        if (e.type == KeyEventType.KeyUp) onLongPress()
+        true
+    }
+
+/**
  * For something that covers home, like a panel: keys' focus goes into it as it appears, while keys are in use (a touch
  * shouldn't focus its text field, raising the keyboard), and stays in it, so the arrows can't reach what's behind.
  * It starts on [start] where that's there, like a panel's ✕, rather than on a text field that keeps the arrows. An
@@ -180,10 +196,10 @@ fun Modifier.holdsKeys(
         onDispose {
             val newest = holders.lastOrNull() === holder
             holders -= holder
-            // What's under it gets the keys back: a panel gone from the window leaves nothing focused, and a menu's
-            // or a dialog's own window gives focus back to none in particular.
+            // What's under it gets the keys back where they were: a panel gone from the window leaves Compose giving
+            // them to the window's first node, and a menu's or a dialog's own window gives them back to none in particular.
             val under = holders.lastOrNull()
-            if (newest && under != null && inputMode.inputMode == InputMode.Keyboard) under.view.post { under.enter() }
+            if (newest && under != null && inputMode.inputMode == InputMode.Keyboard) under.view.post { under.enter(first = true) }
         }
     }
     LaunchedEffect(holder) {
@@ -192,6 +208,7 @@ fun Modifier.holdsKeys(
         // gives its first node focus by itself: going in after that, it starts where it should.
         snapshotFlow { window.isWindowFocused }.first { it }
         if (inputMode.inputMode != InputMode.Keyboard) return@LaunchedEffect
+        holders.lastOrNull { it !== holder && it.view.rootView === view.rootView && it.focused }?.back = lastFocused
         // Content that isn't laid out yet takes it a frame later.
         if (!holder.enter(first = true)) withFrameNanos {}.also { holder.enter(first = true) }
     }
@@ -214,12 +231,91 @@ private class KeyHolder(
 ) {
     var focused = false
 
+    /**
+     * Gives the keys back to where they were in it as one over it in the same window took them, like a settings page
+     * opened from a row: [restoreFocusedChild][FocusRequester.restoreFocusedChild] only reaches its direct children, not
+     * a row in a list.
+     */
+    var back: java.lang.ref.WeakReference<() -> Boolean>? = null
+
     /** Whether keys are in it now. Not [first]: they stay where they are in it. */
-    fun enter(first: Boolean = false): Boolean = !first && focused || entry.restoreFocusedChild() || start?.requestFocus() == true || entry.requestFocus()
+    fun enter(first: Boolean = false): Boolean =
+        !first && focused || entry.restoreFocusedChild() || back?.get()?.invoke() == true || start?.requestFocus() == true || entry.requestFocus()
 }
+
+/** How to give keys' focus back to what last had it, of what takes taps. */
+private var lastFocused: java.lang.ref.WeakReference<() -> Boolean>? = null
 
 /** The [holdsKeys] showing, newest last. */
 private val holders = mutableListOf<KeyHolder>()
+
+/** When keys' focus last left everything in each window, from its [keysRoot]. */
+private val dropped = java.util.WeakHashMap<View, Long>()
+
+/** The windows whose keys [passesKeys] had nowhere to pass yet, for [takesPassedKeys]. */
+private val waiting = java.util.WeakHashMap<View, Boolean>()
+
+/** The windows where keys' focus is on something going, from when, until [passesKeys] has passed them on. */
+private val passing = java.util.WeakHashMap<View, Long>()
+
+/**
+ * Around a window's content: notes when keys' focus leaves everything in it, for [passesKeys], and keeps Compose from
+ * giving it straight to the window's first node meanwhile, which would scroll there.
+ */
+@Composable
+fun Modifier.keysRoot(): Modifier {
+    val view = LocalView.current
+    return onFocusChanged { if (!it.hasFocus) dropped[view.rootView] = SystemClock.uptimeMillis() }
+        .focusProperties { onEnter = { if (view.rootView in passing) cancelFocusChange() } }
+        .focusGroup()
+}
+
+/** A key went down in [window]: keys [passesKeys] had nowhere to pass go where it takes them, not to what shows later. */
+fun keyPressed(window: View) {
+    waiting -= window.rootView
+}
+
+/**
+ * Where keys' focus is on this as it goes, or as it stops taking focus, like a remove button swapped for its confirm or
+ * a − that can't go lower, keys go on to the first of [to] that takes them, rather than being lost. Where none does,
+ * as with an install button swapped for its progress, they wait for one that [takesPassedKeys], like the open it ends
+ * with, unless a key goes down first.
+ */
+@Composable
+fun Modifier.passesKeys(vararg to: FocusRequester): Modifier {
+    val view = LocalView.current
+    val had = remember { booleanArrayOf(false) }
+    val targets = to.toList()
+    val pass = remember { arrayOf<() -> Unit>({}) }
+    pass[0] = {
+        val at = SystemClock.uptimeMillis()
+        val root = view.rootView
+        passing[root] = at
+        // Focus leaving the window's content with it, rather than moving on, is lost. What takes its place is laid out
+        // in the same frame, so it can take focus once that's done.
+        view.post {
+            if (passing[root] == at) passing -= root
+            if ((dropped[root] ?: -1) >= at && targets.none { it.requestFocus() }) waiting[root] = true
+        }
+    }
+    DisposableEffect(Unit) { onDispose { if (had[0]) pass[0]() } }
+    return onFocusChanged {
+        if (had[0] && !it.hasFocus) pass[0]()
+        had[0] = it.hasFocus
+    }
+}
+
+/** Takes the keys [passesKeys] had nowhere to pass as this appears, if no key has gone down since. */
+@Composable
+fun Modifier.takesPassedKeys(): Modifier {
+    val view = LocalView.current
+    val self = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        withFrameNanos {}
+        if (waiting[view.rootView] == true && self.requestFocus()) waiting -= view.rootView
+    }
+    return focusRequester(self)
+}
 
 /**
  * A key that moves focus, with nothing [focused] in [window], has nowhere to move from, as after a tap: it starts in
@@ -370,7 +466,10 @@ private object KeyIndication : IndicationNodeFactory {
     private class Node(
         private val source: InteractionSource,
     ) : Modifier.Node(),
-        DrawModifierNode {
+        DrawModifierNode,
+        FocusRequesterModifierNode {
+        private val refocus = { isAttached && requestFocus() }
+
         private var pressed = 0
         private var hovered = 0
         private var focused = 0
@@ -383,7 +482,10 @@ private object KeyIndication : IndicationNodeFactory {
                         is PressInteraction.Release, is PressInteraction.Cancel -> pressed--
                         is HoverInteraction.Enter -> hovered++
                         is HoverInteraction.Exit -> hovered--
-                        is FocusInteraction.Focus -> focused++
+                        is FocusInteraction.Focus -> {
+                            focused++
+                            lastFocused = java.lang.ref.WeakReference(refocus)
+                        }
                         is FocusInteraction.Unfocus -> focused--
                     }
                     invalidateDraw()

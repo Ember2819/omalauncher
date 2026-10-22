@@ -79,7 +79,8 @@ fun LauncherRoot(
         Modifier
             .fillMaxSize()
             .then(if (showOwnBackground) Modifier.background(Palette.background) else Modifier)
-            .onFocusChanged { state.keysFocused = it.hasFocus },
+            .onFocusChanged { state.keysFocused = it.hasFocus }
+            .keysRoot(),
     ) {
         if (ready) DesktopScreen(runtime, state) else SetupScreen(runtime)
     }

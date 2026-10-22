@@ -184,7 +184,8 @@ private fun KindToggle(
                 label,
                 Modifier
                     .background(if (on) Palette.accent.copy(alpha = 0.15f) else Color.Transparent)
-                    .clickable(enabled = !on) { onPick(k) }
+                    // The shown one still takes a tap, doing nothing, so keys on it as it's picked stay there.
+                    .clickable { if (!on) onPick(k) }
                     .padding(horizontal = 12.dp, vertical = 6.dp),
                 style = Mono.copy(color = if (on) Palette.accent else Palette.muted, fontSize = TextSize.Small),
             )
@@ -555,13 +556,13 @@ private fun Detail(
         when {
             busy != null -> BasicText(busy, style = Mono.copy(color = Palette.accent))
             !e.supported -> BasicText("needs a newer launcher (owl ${e.owl}); update the launcher to install it", style = Mono.copy(color = Palette.red, fontSize = TextSize.Small))
-            update -> BracketAction("update ${installed?.version} → ${e.version}", Palette.accent, onInstall)
+            update -> BracketAction("update ${installed?.version} → ${e.version}", Palette.accent, Modifier.passesKeys(), onInstall)
             // An app opens from here, unless it waits for Linux.
             installed != null && market.kind == OwlKind.App && (linux || !e.needsLinux) ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     AddedMark(market.kind)
                     Spacer(Modifier.width(8.dp))
-                    BracketAction("open", Palette.accent, onOpen)
+                    BracketAction("open", Palette.accent, Modifier.takesPassedKeys(), onOpen)
                 }
             installed != null -> AddedMark(market.kind)
             else ->
@@ -572,6 +573,8 @@ private fun Detail(
                         OwlKind.App, OwlKind.Panel, OwlKind.Keybar -> "install"
                     },
                     Palette.accent,
+                    // Keys on it wait out the install, for the open an app ends with.
+                    Modifier.passesKeys(),
                     onInstall,
                 )
         }

@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import dev.omalauncher.ui.KeyIndicated
+import dev.omalauncher.ui.keyPressed
+import dev.omalauncher.ui.keysRoot
 import dev.omalauncher.ui.keysStartAgain
 import dev.omalauncher.ui.movesFocus
 import androidx.compose.runtime.Composable
@@ -47,7 +49,7 @@ abstract class InstantActivity : ComponentActivity() {
     /** Like setContent, but drawing nothing while the window leaves. */
     protected fun setInstantContent(content: @Composable () -> Unit) {
         setContent {
-            if (!hidden) KeyIndicated { Box(Modifier.onFocusChanged { keysFocused = it.hasFocus }) { content() } }
+            if (!hidden) KeyIndicated { Box(Modifier.onFocusChanged { keysFocused = it.hasFocus }.keysRoot()) { content() } }
         }
     }
 
@@ -59,6 +61,7 @@ abstract class InstantActivity : ComponentActivity() {
     @SuppressLint("RestrictedApi")
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         val down = event.action == KeyEvent.ACTION_DOWN
+        if (down) keyPressed(window.decorView)
         if (down && movesFocus(event.keyCode) && keysStartAgain(window.decorView, keysFocused)) return true
         if (down && event.isPrintingKey && !keysFocused) keysStartAgain(window.decorView, focused = false)
         return super.dispatchKeyEvent(event) || escapeAsBack(event)

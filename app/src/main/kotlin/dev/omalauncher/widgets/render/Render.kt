@@ -89,6 +89,12 @@ import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.focus.onFocusChanged
+import dev.omalauncher.ui.activateKeys
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -944,6 +950,8 @@ private fun handlers(
     val press = el.handlers["onPress"]
     val release = el.handlers["onRelease"]
     if (press != null || release != null) {
+        // Keys press one with nothing to tap, like the terminal key bar's keys or a game's D-pad.
+        if (tap == null && long == null) m = m.then(keyPressed(p, press, release))
         m =
             m.pointerInput(el, p.env) {
                 coroutineScope {
@@ -977,6 +985,50 @@ private fun handlers(
             }
     }
     return m
+}
+
+/**
+ * A node with onPress or onRelease and nothing to tap: keys reach it as one that takes taps ([keyFocus]), and Enter
+ * presses it at its middle as it goes down, again as it repeats where it `repeats`, and lets it go as it lifts, or as
+ * keys move off it while it's held.
+ */
+@Composable
+private fun keyPressed(
+    p: Props,
+    press: Action?,
+    release: Action?,
+): Modifier {
+    val density = LocalDensity.current.density
+    val bounds = remember { mutableStateOf(IntSize.Zero) }
+    val held = remember { booleanArrayOf(false, false) }
+    fun run(n: Int) =
+        press?.run(p.env, listOf(Num((bounds.value.width / 2f / density).toDouble()), Num((bounds.value.height / 2f / density).toDouble()), Num(n.toDouble())))
+    fun letGo() {
+        if (!held[1]) return
+        held[1] = false
+        release?.run(p.env, emptyList())
+    }
+    return Modifier
+        .onSizeChanged { bounds.value = it }
+        .onFocusChanged {
+            held[0] = it.isFocused
+            if (!it.isFocused) letGo()
+        }.onPreviewKeyEvent { e ->
+            if (e.key !in activateKeys || !held[0]) return@onPreviewKeyEvent false
+            when (e.type) {
+                KeyEventType.KeyDown -> {
+                    val n = e.nativeKeyEvent.repeatCount
+                    if (n == 0) {
+                        held[1] = true
+                        run(0)
+                    } else if (held[1] && p.now("repeats")?.truthy == true) {
+                        run(n)
+                    }
+                }
+                KeyEventType.KeyUp -> letGo()
+            }
+            true
+        }.then(keyFocus(p, null, null) { _, _, _ -> })
 }
 
 /** The node a key tapped last in each widget: a Popup it opens gives focus back to it as it closes. */
