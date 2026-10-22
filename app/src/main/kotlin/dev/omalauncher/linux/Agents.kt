@@ -187,8 +187,11 @@ class AgentStore(
     /**
      * Codex starts a shared background server and reads its start time with `ps`; when that fails, Codex
      * refuses to start ("failed to read start time for pid-managed app server", rerun with --no-daemon).
-     * Proot kills that server with its window anyway, so don't start it. A system layer, so the user's
-     * ~/.codex/config.toml stays theirs and can turn it back on.
+     * Proot kills that server with its window anyway, so don't start it. Codex's sandbox can't run either:
+     * before calling bwrap it looks up its socket directory in /proc/self/mountinfo, which is Android's
+     * under proot, and fails every command ("cannot establish app-server socket mount isolation"). The
+     * bwrap shim drops the sandbox anyway, so full access is what Codex already had. A system layer, so
+     * the user's ~/.codex/config.toml stays theirs and can change both.
      */
     private fun codexConfig() =
         if (installed.none { it.bin == "codex" }) {
@@ -196,7 +199,7 @@ class AgentStore(
         } else {
             listOf(
                 Managed.text(File(proot.rootfs, "etc/codex/config.toml"), Policy.Owned) {
-                    "# Written by the launcher.\n[features]\ndaemon_auto_start = false\n"
+                    "# Written by the launcher.\nsandbox_mode = \"danger-full-access\"\n\n[features]\ndaemon_auto_start = false\n"
                 },
             )
         }
