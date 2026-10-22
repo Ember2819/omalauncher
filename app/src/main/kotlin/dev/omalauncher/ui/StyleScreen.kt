@@ -146,7 +146,7 @@ fun StyleScreen(
             Stepper("gaps out", style, Style.GAPS_OUT)
             Stepper("border width", style, Style.TILE_BORDER_WIDTH)
             NumberSlider("opacity", style, Style.TILE_OPACITY)
-            Flag("frost", "on", "off", style, Style.TILE_FROST)
+            Flag("frosted glass", "on", "off", style, Style.TILE_FROST)
             WidgetPreview()
             Heading("screens")
             Stepper("gaps out", style, Style.SCREEN_GAPS_OUT)
