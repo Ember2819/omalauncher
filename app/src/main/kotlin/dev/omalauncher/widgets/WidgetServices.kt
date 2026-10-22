@@ -83,6 +83,7 @@ import dev.omalauncher.widgets.runtime.Modes
 import dev.omalauncher.widgets.runtime.Notifications
 import dev.omalauncher.widgets.runtime.Services
 import dev.omalauncher.widgets.runtime.Streams
+import dev.omalauncher.widgets.runtime.SystemPanels
 import dev.omalauncher.widgets.runtime.Volume
 import dev.omalauncher.widgets.runtime.watchFile
 import kotlinx.coroutines.CoroutineScope
@@ -155,6 +156,7 @@ class WidgetServices(
     private val volume = Volume(context)
     private val alarm = Alarm(context)
     private val modes = Modes(context)
+    private val panels = SystemPanels(context)
 
     /** Opens launcher screens ("style" or "themes", "agents", "drawer"); set by the UI. */
     var launcherAction: ((String) -> Unit)? = null
@@ -571,8 +573,9 @@ class WidgetServices(
             "url" -> if (!context.openUrl(arg)) Toast.makeText(context, "no app opens $arg", Toast.LENGTH_SHORT).show()
             "launcher" -> launcherAction?.invoke(arg)
             "media" -> media.control(arg)
-            "volume" -> volume.control(args[0])
-            "notification" -> args.getOrNull(1)?.takeIf { it != Null }?.let { notifications.control(arg, it.toString()) }
+            "volume" -> volume.control(args[0], args.getOrNull(1)?.takeIf { it != Null }?.toString())
+            "notification" -> notifications.control(arg, args.getOrNull(1)?.takeIf { it != Null }?.toString(), args.getOrNull(2))
+            "settings" -> panels.open(arg)
             "androidApp" -> openAndroidApp(arg)
             "copy" -> copy(arg)
             "notify" -> notify(arg, args.getOrNull(1)?.takeIf { it != Null }?.toString())

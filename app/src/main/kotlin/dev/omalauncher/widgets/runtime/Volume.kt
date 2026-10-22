@@ -23,25 +23,27 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlin.math.roundToInt
 
-/** The media volume, for `source v = android.volume`, and `volume(...)` to change it. */
+/**
+ * The volume, for `source v = android.volume`: the media stream's at the top, the others under their names; and
+ * `volume(...)` to change one.
+ */
 class Volume(
     private val context: Context,
 ) {
     private val audio = context.getSystemService(AudioManager::class.java)
-    private val stream = AudioManager.STREAM_MUSIC
 
-    fun value(): Value {
+    private fun level(stream: Int): Map<String, Value> {
         val max = audio.getStreamMaxVolume(stream).coerceAtLeast(1)
         val now = audio.getStreamVolume(stream)
-        return Obj(
-            mapOf(
-                "level" to Num((now * 100.0 / max).roundToInt().toDouble()),
-                "muted" to bool(audio.isStreamMute(stream)),
-                // The phone's own steps: a slider with step: 100 / steps lands on each.
-                "steps" to Num(max.toDouble()),
-            ),
+        return mapOf(
+            "level" to Num((now * 100.0 / max).roundToInt().toDouble()),
+            "muted" to bool(audio.isStreamMute(stream)),
+            // The phone's own steps: a slider with step: 100 / steps lands on each.
+            "steps" to Num(max.toDouble()),
         )
     }
+
+    fun value(): Value = Obj(level(AudioManager.STREAM_MUSIC) + STREAMS.filterKeys { it != "media" }.mapValues { (_, s) -> Obj(level(s)) })
 
     /** Emits whenever the volume or mute changes, from any app or the hardware buttons. */
     fun updates(): Flow<Value> =
@@ -77,9 +79,16 @@ class Volume(
             }
         }.conflate().map { value() }.distinctUntilChanged()
 
-    /** volume(50) sets the level in percent; "up", "down", "mute", "unmute" and "toggle" step or mute it. */
-    fun control(arg: Value) {
-        // Do Not Disturb can refuse changes; a widget tap mustn't crash the launcher over it.
+    /**
+     * volume(50) sets the level in percent; "up", "down", "mute", "unmute" and "toggle" step or mute it. [name] picks
+     * the stream, media when it's null.
+     */
+    fun control(
+        arg: Value,
+        name: String? = null,
+    ) {
+        val stream = STREAMS[name ?: "media"] ?: return
+        // Do Not Disturb refuses changes to the ringer while it's on; a widget tap mustn't crash the launcher over it.
         runCatching {
             val level = arg.num()
             if (level != null) {
@@ -98,5 +107,16 @@ class Volume(
                 }
             audio.adjustStreamVolume(stream, direction, 0)
         }
+    }
+
+    private companion object {
+        /** By the words in owl's VOLUME_STREAMS. */
+        val STREAMS =
+            mapOf(
+                "media" to AudioManager.STREAM_MUSIC,
+                "ring" to AudioManager.STREAM_RING,
+                "notification" to AudioManager.STREAM_NOTIFICATION,
+                "alarm" to AudioManager.STREAM_ALARM,
+            )
     }
 }

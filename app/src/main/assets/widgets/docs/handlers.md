@@ -60,8 +60,10 @@ after it in its block (and blocks inside them), and needs a name not used for a 
 | `refresh()` | re-runs this widget's sources now |
 | `screen()` / `close()` | opens the widget's `screen { }` full screen, or closes it (owl 5) |
 | `media("toggle")` | controls what's playing: `toggle`, `play`, `pause`, `next`, `previous`, or `open` (brings up the player app) |
-| `volume(50)` | sets the media volume in percent; or `volume("up")`, `"down"`, `"mute"`, `"unmute"`, `"toggle"` (owl 4) |
-| `notification("open", key)` | opens a notification from `android.notifications` as tapping it in the shade would; `"dismiss"` clears it. Without notification access, opens the setting that grants it (owl 4) |
+| `volume(50)` | sets the media volume in percent; or `volume("up")`, `"down"`, `"mute"`, `"unmute"`, `"toggle"` (owl 4). A second value picks another stream: `volume(30, "ring")`, `"notification"`, `"alarm"` or `"media"` (owl 13). Do Not Disturb can refuse ringer changes |
+| `notification("open", key)` | opens a notification from `android.notifications` as tapping it in the shade would; `"dismiss"` clears it. Without notification access, opens the setting that grants it (owl 4). `notification("clear")` clears every one that can be, as the shade's Clear all does (owl 13) |
+| `notification("action", key, i)` | presses the `i`-th of a notification's `actions`, counted from 0, as tapping its button in the shade would. One whose `reply` is true takes text instead: `notification("reply", key, text)` answers through it, as replying in the shade does: `Input { onSubmit: notification("reply", item.key, value) }`. The store review lists both, since they act as you in other apps (owl 13) |
+| `settings("wifi")` | opens Android's own panel, a sheet over home, or its settings screen where it has no panel: `internet`, `wifi`, `bluetooth`, `airplane`, `data`, `location`, `cast`, `nfc`, `volume`, `sound`, `dnd`, `display`, `dark`, `battery` or `notifications`. For what a launcher may show but not switch, like the radios in `android.modes` (owl 13) |
 
 ## Sending
 

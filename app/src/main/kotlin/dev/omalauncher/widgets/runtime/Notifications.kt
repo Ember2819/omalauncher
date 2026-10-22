@@ -2,7 +2,11 @@ package dev.omalauncher.widgets.runtime
 
 import android.app.ActivityOptions
 import android.app.Notification
+import android.app.PendingIntent
+import android.app.RemoteInput
 import android.content.Context
+import android.content.Intent
+import android.os.Bundle
 import android.os.Build
 import android.os.UserHandle
 import android.service.notification.StatusBarNotification
@@ -13,6 +17,7 @@ import dev.omalauncher.widgets.lang.Obj
 import dev.omalauncher.widgets.lang.Str
 import dev.omalauncher.widgets.lang.Value
 import dev.omalauncher.widgets.lang.bool
+import dev.omalauncher.widgets.lang.num
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -20,10 +25,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
 /**
- * The phone's notifications, for `source n = android.notifications`, and
- * `notification("open" | "dismiss", key)`. Read through [MediaListener], so
- * they need the same notification access as media widgets. Nothing is kept:
- * each update reads what's in the shade now.
+ * The phone's notifications, for `source n = android.notifications`, and `notification(...)` to open, dismiss or
+ * clear them, press their buttons or reply to them. Read through [MediaListener], so they need the same notification
+ * access as media widgets. Nothing is kept: each update reads what's in the shade now.
  */
 class Notifications(
     private val context: Context,
@@ -75,39 +79,81 @@ class Notifications(
                         "text" to Str(text(sbn).orEmpty()),
                         "time" to Num(Math.floor(sbn.postTime / 1000.0)),
                         "clearable" to bool(sbn.isClearable),
+                        "actions" to Lst(actions(sbn).map(::action)),
                     ),
                 )
             }
         return Obj(mapOf("available" to bool(available), "count" to Num(shown.size.toDouble()), "items" to Lst(items)))
     }
 
+    /** The buttons under a notification in the shade, in order: notification("action", key, i) presses the i-th. */
+    private fun actions(sbn: StatusBarNotification): List<Notification.Action> = sbn.notification.actions.orEmpty().toList()
+
+    /** Whether the button takes typed text, as Reply does: notification("reply", ...) answers through it. */
+    private fun replies(a: Notification.Action) = a.remoteInputs.orEmpty().any { it.allowFreeFormInput }
+
+    private fun action(a: Notification.Action) = Obj(mapOf("title" to Str(a.title?.toString().orEmpty()), "reply" to bool(replies(a))))
+
     /** Emits whenever a notification is posted or removed, or access is granted or revoked. */
     fun updates(): Flow<Value> = MediaListener.changes.map { withContext(worker) { value() } }.distinctUntilChanged()
 
-    /** "open" runs the notification's tap action, "dismiss" clears it; without access, opens the setting that grants it. */
+    /**
+     * "open" runs the notification's tap action and "dismiss" clears it; "clear" clears every one that can be, as the
+     * shade's Clear all does. "action" presses the [arg]-th of its buttons, and "reply" sends [arg] as typed text through
+     * the one that takes it. Without access, opens the setting that grants it.
+     */
     fun control(
         command: String,
-        key: String,
+        key: String?,
+        arg: Value?,
     ) {
         val listener = MediaListener.connected
         if (!media.granted || listener == null) return media.openAccessSettings()
-        val sbn = runCatching { listener.getActiveNotifications(arrayOf(key)) }.getOrNull()?.firstOrNull() ?: return
+        if (command == "clear") return listener.cancelAllNotifications()
+        val sbn = key?.let { runCatching { listener.getActiveNotifications(arrayOf(it)) }.getOrNull()?.firstOrNull() } ?: return
         when (command) {
-            "open" -> {
-                val intent = sbn.notification.contentIntent ?: return
-                // The launcher is in front, so it may start the app; since Android 14 it has to say so.
-                val options =
-                    if (Build.VERSION.SDK_INT >= 34) {
-                        @Suppress("DEPRECATION")
-                        ActivityOptions.makeBasic().setPendingIntentBackgroundActivityStartMode(ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED).toBundle()
-                    } else {
-                        null
-                    }
-                runCatching { intent.send(context, 0, null, null, null, null, options) }
-                if (sbn.notification.flags and Notification.FLAG_AUTO_CANCEL != 0) listener.cancelNotification(key)
+            "open" -> if (send(sbn.notification.contentIntent)) autoCancel(listener, sbn)
+            "dismiss" -> listener.cancelNotification(sbn.key)
+            "action" -> {
+                val action = arg?.num()?.toInt()?.let { actions(sbn).getOrNull(it) } ?: return
+                // Pressed bare, a reply button would send the app no text: that's "reply".
+                if (!replies(action)) send(action.actionIntent)
             }
-            "dismiss" -> listener.cancelNotification(key)
+            "reply" -> {
+                val text = arg?.takeIf { it != Null }?.toString()?.takeIf { it.isNotBlank() } ?: return
+                val action = actions(sbn).firstOrNull(::replies) ?: return
+                val inputs = action.remoteInputs.filter { it.allowFreeFormInput }.toTypedArray()
+                val fill = Intent().addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
+                RemoteInput.addResultsToIntent(inputs, fill, Bundle().apply { inputs.forEach { putCharSequence(it.resultKey, text) } })
+                // Typed, as from the keyboard: some apps treat a reply picked from suggestions differently.
+                RemoteInput.setResultsSource(fill, RemoteInput.SOURCE_FREE_FORM_INPUT)
+                send(action.actionIntent, fill)
+            }
         }
+    }
+
+    /** Sends one of a notification's intents from the launcher, in front; false if the app had cancelled it. */
+    private fun send(
+        intent: PendingIntent?,
+        fill: Intent? = null,
+    ): Boolean {
+        intent ?: return false
+        // The launcher is in front, so it may start the app; since Android 14 it has to say so.
+        val options =
+            if (Build.VERSION.SDK_INT >= 34) {
+                @Suppress("DEPRECATION")
+                ActivityOptions.makeBasic().setPendingIntentBackgroundActivityStartMode(ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED).toBundle()
+            } else {
+                null
+            }
+        return runCatching { intent.send(context, 0, fill, null, null, null, options) }.isSuccess
+    }
+
+    private fun autoCancel(
+        listener: MediaListener,
+        sbn: StatusBarNotification,
+    ) {
+        if (sbn.notification.flags and Notification.FLAG_AUTO_CANCEL != 0) listener.cancelNotification(sbn.key)
     }
 
     companion object {

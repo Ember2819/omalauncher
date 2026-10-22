@@ -27,6 +27,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -73,7 +75,9 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import dev.omalauncher.widgets.runtime.PicturePainter
 import dev.omalauncher.widgets.runtime.WidgetImage
+import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onSizeChanged
@@ -870,7 +874,40 @@ private fun handlers(p: Props): Modifier {
             }
     }
     el.handlers["onDrag"]?.let { a ->
-        m = m.pointerInput(el, p.env) { detectDragGestures { change, drag -> change.consume(); fire(a, drag.x, drag.y, change.position.x, change.position.y) } }
+        val end = el.handlers["onDragEnd"]
+        // drag: horizontal or vertical takes only moves along it, so the list around the node still scrolls the other way (owl 13).
+        val axis = p.now("drag")?.toString()
+        m =
+            m.pointerInput(el, p.env, axis) {
+                val velocity = VelocityTracker()
+                // Where the drag has got to, from its moves: the node may move with the finger (offset: [dragX, 0]),
+                // so the finger's place on it says nothing about its speed.
+                var travelled = Offset.Zero
+                val start: (Offset) -> Unit = {
+                    velocity.resetTracking()
+                    travelled = Offset.Zero
+                }
+                fun move(
+                    change: PointerInputChange,
+                    dx: Float,
+                    dy: Float,
+                ) {
+                    change.consume()
+                    travelled += Offset(dx, dy)
+                    velocity.addPosition(change.uptimeMillis, travelled)
+                    fire(a, dx, dy, change.position.x, change.position.y)
+                }
+                // A cancelled drag (the node went, another gesture took over) ends at rest, so nothing reads it as a flick.
+                fun ended(cancelled: Boolean) {
+                    val v = velocity.calculateVelocity()
+                    end?.let { if (cancelled) fire(it, 0f, 0f) else fire(it, v.x, v.y) }
+                }
+                when (axis) {
+                    "horizontal" -> detectHorizontalDragGestures(start, { ended(false) }, { ended(true) }) { change, dx -> move(change, dx, 0f) }
+                    "vertical" -> detectVerticalDragGestures(start, { ended(false) }, { ended(true) }) { change, dy -> move(change, 0f, dy) }
+                    else -> detectDragGestures(start, { ended(false) }, { ended(true) }) { change, drag -> move(change, drag.x, drag.y) }
+                }
+            }
     }
     // As the finger goes down, not up: a key acts at once, and with `repeats` again while held, as a keyboard's
     // keys do (owl 12). Touches aren't consumed, so onTap and onLongPress on the same node still see them.

@@ -36,7 +36,10 @@ Every node also takes:
   (without `radius`, bordered elements follow the launcher's corner style: 0 for edge, 4 for soft, 8 for round;
   anything else matches it with `radius: 8 * corners`)
 - `opacity`, `rotation` (degrees), `scale`, `offset: [x, y]` (dp), `visible`
-- handlers: `onTap` (with `x`, `y`) and `onDrag` (with `dx`, `dy`, `x`, `y`); `onPress` as the finger goes down, before
+- handlers: `onTap` (with `x`, `y`) and `onDrag` (with `dx`, `dy`, `x`, `y`). Since owl 13, `drag: horizontal` (or
+  `vertical`) has `onDrag` take only moves along it, so a list it's in still scrolls the other way, and `onDragEnd` runs as
+  the finger lets go, with `vx` and `vy`, how fast it was moving in dp a second: a row that follows the finger with
+  `offset: [dragX, 0]` can go when it's let go far out or flicked (see `controls.owl`); `onPress` as the finger goes down, before
   it's a tap (with `x`, `y` and `repeat`), and `onRelease` when it lifts or moves on to a scroll (owl 12). `onPress` runs for
   every touch, the start of a scroll too, so in a list or anything else that scrolls, `onTap` is the one for a tap. With
   `repeats: true`, `onPress` runs again while the finger stays down, after 400 ms and then every 50 ms, as a keyboard's

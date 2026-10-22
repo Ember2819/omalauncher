@@ -3,8 +3,9 @@
 Part of the widget docs: README.md, one folder up, comes first, and paths here are from the widgets folder.
 
 A panel is a file of its own that a swipe on home opens: swiping up opens the app drawer, above the prompt bar;
-swiping down brings one from the top. The app drawer is a panel too, `drawer.owl`, and the launcher has no other:
-edit it to change the drawer, or read it to see how a whole drawer is put together. Which panel each swipe opens
+swiping down brings one from the top. The app drawer is a panel too, `drawer.owl`: edit it to change the drawer, or
+read it to see how a whole drawer is put together. The launcher ships one more, `controls.owl`, for swiping down: the
+phone's switches, the volume, what's playing, the next alarm and the notifications. Which panel each swipe opens
 is picked in settings › gestures, or in style.toml as the panel's file name (see `defaults.toml`):
 
 ```toml
