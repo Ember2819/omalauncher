@@ -232,3 +232,5 @@ widget "shell" {
   is removed or its file changes. When `command` exits, the tile offers a restart;
   use `"btop; exec bash"` to fall back to a shell.
 - `padding: 0` lets the terminal fill the tile's frame.
+- Its background is see-through: the tile's glass (`widgets.opacity` in style.toml), or a `background`
+  behind it, shows where the program leaves the terminal's own. Cells a program colors, like a status line, stay solid.
