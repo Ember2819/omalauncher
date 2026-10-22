@@ -631,6 +631,16 @@ class LangTest {
         Compiler.compile("widget {\n meta { owl: 10 }\n component C(gapsOut) { Box { padding: gapsOut } }\n C { gapsOut: 2 } }")
     }
 
+    @Test fun tileGlassFollowsTheLauncherStyle() {
+        val style =
+            object : Host by TestHost(0) {
+                override fun tile(name: String): Value = mapOf("tileOpacity" to Num(0.5), "tileFrost" to Num(24.0))[name] ?: Null
+            }
+        val p = Compiler.compile("face \"f\" {\n meta { owl: 13 }\n Text { text: \"${'$'}{tileOpacity} ${'$'}{tileFrost}\" } }")
+        assertEquals("0.5 24", (p.root.single() as WNode.Element).props["text"]!!(Env.root(style)).text())
+        assertTrue(compileError("widget {\n meta { owl: 12 }\n Box { frost: tileFrost } }").contains("tileFrost needs owl 13"))
+    }
+
     @Test fun requiresDeclaresPackagesPerManager() {
         val p = Compiler.compile("widget {\n  requires { pacman: [\"jq\", \"curl\"] }\n  requires { pacman: \"jq\" }\n  Text { text: \"x\" }\n}")
         assertEquals(mapOf("pacman" to listOf("jq", "curl")), p.requires)

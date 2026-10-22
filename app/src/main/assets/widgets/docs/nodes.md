@@ -75,6 +75,11 @@ doesn't. It needs `meta { owl: 6 }`.
 widget with a frame of its own can space and outline it like home's tiles (`border: borderWidth`). In a keybar `gapsOut`
 and `borderWidth` are the terminal key bar's own settings instead. They need `meta { owl: 12 }`.
 
+`tileOpacity` and `tileFrost` are the glass of home's tiles, from settings › style: how much a widget covers the
+wallpaper, 0 (clear) to 1 (solid), and how much it blurs it in dp, 0 with frosted glass off. A face's windows, or a
+widget's cards, look like home's tiles with `background: alpha(background, tileOpacity); frost: tileFrost`, and follow
+the settings as they change. They need `meta { owl: 13 }`.
+
 ## Text in a Row
 
 Since owl 10 a Text in a Row or Flow is as wide as its text, like a Button: labels, chips and values sit side by

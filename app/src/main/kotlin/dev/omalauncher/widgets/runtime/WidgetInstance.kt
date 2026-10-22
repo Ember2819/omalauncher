@@ -413,6 +413,8 @@ class WidgetInstance(
                 "linux" -> return bool(linux())
                 "corners" -> return Num(LauncherStyle.cornerScale.toDouble())
                 "gapsIn", "gapsOut", "borderWidth" -> return Num(LauncherStyle.style[frameSetting(name)])
+                "tileOpacity" -> return Num(LauncherStyle.style[Style.TILE_OPACITY])
+                "tileFrost" -> return Num(if (LauncherStyle.style[Style.TILE_FROST]) Style.TILE_FROST_DP else 0.0)
                 "screenWidth" -> screenSize.value[0]
                 "screenHeight" -> screenSize.value[1]
                 "screenInset" -> screenInset.doubleValue
