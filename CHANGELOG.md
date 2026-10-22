@@ -4,7 +4,7 @@ The most important changes in each release. The Play Store notes for a release
 are in `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt`.
 Dates are when the build was uploaded to Play.
 
-## 0.12.0 (versionCode 21)
+## 0.12.0 (versionCode 21) – 2026-10-23
 
 - controls.owl, a control center for swiping down on home: the phone's switches,
   brightness, volume and where it plays, Do Not Disturb and the torch with their
