@@ -570,7 +570,8 @@ class WidgetServices(
             mapOf(
                 "level" to Num(if (level >= 0) (level * 100 / scale).toDouble() else 0.0),
                 "charging" to bool(charging),
-                "status" to Str(if (charging) "charging" else "on battery"),
+                // Plugged in but not charging: full, or held below full to spare the battery.
+                "status" to Str(if (charging) "charging" else if (plugged != null) "plugged in" else "on battery"),
                 // Reported in tenths of a degree and in millivolts.
                 "temp" to (extra(BatteryManager.EXTRA_TEMPERATURE)?.let { Num(it / 10.0) } ?: Null),
                 "voltage" to (extra(BatteryManager.EXTRA_VOLTAGE)?.let { Num(it / 1000.0) } ?: Null),
