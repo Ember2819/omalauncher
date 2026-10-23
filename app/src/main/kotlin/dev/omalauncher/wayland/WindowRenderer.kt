@@ -33,19 +33,15 @@ data class SurfaceHit(
  * surface of its activity's SurfaceView. It runs on its own thread, paced by
  * vsync: each frame snapshots the scene under the server lock (no pixels
  * move under it), redraws only what changed, posts, and then tells the
- * clients the frame is done, so they draw at most once per display frame
- * and not at all while the window is hidden.
+ * clients the frame is done, so they draw at most once per display frame,
+ * 60 times a second at most, and not at all while the window is hidden.
  */
 class WindowRenderer(
     private val server: WaylandServer,
     private val window: XdgToplevel,
     /** Keeps the window's alpha, for a view that isn't opaque to show what's behind it; else it's filled with [background]. */
     private val translucent: Boolean = false,
-    /** At most this many frames a second, whatever the screen's rate; 0 for every vsync. */
-    maxFps: Int = 0,
 ) {
-    /** The least time between frames, less a quarter so a frame a little early still takes its vsync. */
-    private val minInterval = if (maxFps > 0) 1_000_000_000L / maxFps * 3 / 4 else 0L
     private var lastFrame = 0L
 
     private val thread = HandlerThread("wl-render").apply { start() }
@@ -124,7 +120,7 @@ class WindowRenderer(
 
     private fun frame(nanos: Long) {
         // Too soon after the last: the next vsync, still requested, and the clients wait for it too.
-        if (nanos - lastFrame < minInterval) {
+        if (nanos - lastFrame < MIN_INTERVAL) {
             choreographer?.postFrameCallback(callback)
             return
         }
@@ -258,4 +254,13 @@ class WindowRenderer(
 
     /** Whether this window has a popup open; a tap elsewhere closes it. */
     val hasPopups get() = scene.any { it.inPopup }
+
+    private companion object {
+        /**
+         * At most 60 frames a second, whatever the screen's rate: Linux apps draw in software under proot, and on a
+         * 120 Hz screen following it took twice the CPU and battery. The least time between frames, less a quarter so
+         * a frame a little early still takes its vsync.
+         */
+        const val MIN_INTERVAL = 1_000_000_000L / 60 * 3 / 4
+    }
 }

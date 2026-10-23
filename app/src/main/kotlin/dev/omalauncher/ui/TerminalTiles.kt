@@ -410,8 +410,7 @@ private class EmbeddedWindowView(
     private fun bind() {
         val w = window ?: return
         if (renderer != null || !isAttachedToWindow) return
-        // 60 a second: a widget on home, where 120 on a 120 Hz screen would be twice the battery for a terminal's text.
-        val r = WindowRenderer(tiles.server, w, translucent = true, maxFps = 60).also { it.background = android.graphics.Color.TRANSPARENT }
+        val r = WindowRenderer(tiles.server, w, translucent = true).also { it.background = android.graphics.Color.TRANSPARENT }
         renderer = r
         showing.getOrPut(w) { ArrayList() } += r
         w.renderer = r
