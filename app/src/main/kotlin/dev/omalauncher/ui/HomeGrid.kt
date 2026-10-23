@@ -1,6 +1,7 @@
 package dev.omalauncher.ui
 
 import androidx.compose.runtime.CompositionLocalProvider
+import dev.omalauncher.widgets.render.LocalHomeCovered
 import dev.omalauncher.widgets.render.LocalLongPressClaim
 import dev.omalauncher.widgets.render.LongPressClaim
 import androidx.compose.runtime.SideEffect
@@ -48,6 +49,8 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.foundation.focusGroup
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -703,13 +706,20 @@ internal fun HomeGrid(
         ) {
             // A face's nodes say here when they take a long press, so the menu doesn't open for it too.
             CompositionLocalProvider(LocalLongPressClaim provides claims) {
-                HorizontalPager(pager, Modifier.fillMaxSize(), key = { slots.getOrNull(it)?.first() ?: -it }) { slot ->
+                // The pages either side are made ahead, so a swipe doesn't start by composing the one it brings in. Their
+                // animated widgets wait until some of the page shows.
+                val homeCovered = LocalHomeCovered.current
+                HorizontalPager(pager, Modifier.fillMaxSize(), beyondViewportPageCount = 1, key = { slots.getOrNull(it)?.first() ?: -it }) { slot ->
                     val shown = pagesAt(slot, slots)
                     val g = gridFor(shown, grid to wide)
-                    Row(Modifier.fillMaxSize()) {
-                        for (page in shown) {
-                            Box(Modifier.width(with(density) { g.width.toDp() }).fillMaxHeight()) {
-                                TiledPage(page, itemsOn(page), layout, g, arrange, selected, render, actions, onNoRoom, feed)
+                    val covered = remember(homeCovered, pager, slot) { { homeCovered() || pager.layoutInfo.visiblePagesInfo.none { it.index == slot } } }
+                    CompositionLocalProvider(LocalHomeCovered provides covered) {
+                        // Keys stay on the page showing: the first arrow on home went to the first page made, one of these.
+                        Row(Modifier.fillMaxSize().focusProperties { onEnter = { if (slot != pager.currentPage) cancelFocusChange() } }.focusGroup()) {
+                            for (page in shown) {
+                                Box(Modifier.width(with(density) { g.width.toDp() }).fillMaxHeight()) {
+                                    TiledPage(page, itemsOn(page), layout, g, arrange, selected, render, actions, onNoRoom, feed)
+                                }
                             }
                         }
                     }
