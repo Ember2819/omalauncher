@@ -3,6 +3,7 @@ package dev.omalauncher.widgets
 import android.content.Context
 import dev.omalauncher.LauncherData
 import dev.omalauncher.Runtime
+import dev.omalauncher.sha256Hex
 import dev.omalauncher.theme.Toml
 import dev.omalauncher.upgrade.SyncedFile
 import dev.omalauncher.widgets.lang.OwlKind
@@ -312,9 +313,5 @@ class HomeStore(
         private val PREFIXES = listOf(APP, LINUX, OWL, SHORTCUT)
     }
 
-    private fun hash(text: String) =
-        java.security.MessageDigest
-            .getInstance("SHA-256")
-            .digest(text.toByteArray())
-            .joinToString("") { "%02x".format(it) }
+    private fun hash(text: String) = sha256Hex(text.toByteArray())
 }

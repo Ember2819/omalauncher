@@ -388,7 +388,7 @@ fun HomeScreen(
                 // Nothing until they're loaded, so the bar doesn't jump down as they arrive.
                 if (offered != null) Column {
                     if (menu != null && offered.isNotEmpty()) {
-                        MenuItems(emptyList(), { state.editing = null }, minWidth = 160.dp, itemPadding = 12.dp, fontSize = TextSize.Item) {
+                        MenuItems(emptyList(), { state.editing = null }, minWidth = 160.dp, itemPadding = 12.dp) {
                             ShortcutRows(offered, menu, { state.editing = null }, TextSize.Item, rule = false)
                         }
                         Spacer(Modifier.height(6.dp))
@@ -472,7 +472,7 @@ private fun FaceInvite(
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            BasicText("a face of your own", style = Mono.copy(color = Palette.accent, fontSize = TextSize.Item))
+            BasicText("a face of your own", style = Mono.copy(color = Palette.accent))
             // The theme's own text color: muted is too faint on some themes' card.
             BasicText(
                 "This page is yours to fill with a face: a feed, a dashboard, a start page, a game. Say what you want and " +

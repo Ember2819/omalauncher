@@ -142,6 +142,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.max
 import kotlin.math.min
+import dev.omalauncher.widgets.lang.textOrNull
 
 /** Whether the home screen is hidden (drawer, full-screen panel); animated widgets stop ticking while it is. */
 val LocalHomeCovered = staticCompositionLocalOf<() -> Boolean> { { false } }
@@ -245,31 +246,27 @@ private const val TICK = 1_000_000_000L / WIDGET_FPS
 fun WidgetScreen(
     inst: WidgetInstance,
     modifier: Modifier = Modifier,
-) {
-    val nodes = inst.program.screen ?: return
-    if (inst.program.animated) FrameClock(inst) { false }
-    BoxWithConstraints(modifier) {
-        // Set before the nodes compose, so the first frame already has the size instead of null.
-        inst.setScreen(maxWidth.value.toDouble(), maxHeight.value.toDouble())
-        Column(Modifier.fillMaxSize()) {
-            CompositionLocalProvider(LocalLongPress provides true) {
-                Nodes(nodes, inst.root, inst, this)
-            }
-        }
-    }
-}
+) = ScreenNodes(inst, modifier, Modifier.fillMaxSize())
 
 /** Extra keys (`keybar "…" { }`): their nodes over the soft keyboard, as wide as there's room for and as tall as they are. */
 @Composable
 fun WidgetKeybar(
     inst: WidgetInstance,
     modifier: Modifier = Modifier,
+) = ScreenNodes(inst, modifier, Modifier.fillMaxWidth())
+
+@Composable
+private fun ScreenNodes(
+    inst: WidgetInstance,
+    modifier: Modifier,
+    column: Modifier,
 ) {
     val nodes = inst.program.screen ?: return
     if (inst.program.animated) FrameClock(inst) { false }
     BoxWithConstraints(modifier) {
+        // Set before the nodes compose, so the first frame already has the size instead of null.
         inst.setScreen(maxWidth.value.toDouble(), maxHeight.value.toDouble())
-        Column(Modifier.fillMaxWidth()) {
+        Column(column) {
             CompositionLocalProvider(LocalLongPress provides true) {
                 Nodes(nodes, inst.root, inst, this)
             }
@@ -670,7 +667,7 @@ private fun Element(
         }
         "Image" -> {
             // A src still loading is no image yet, not one named "null".
-            val src = p.observe("src")?.takeIf { it != Null }?.toString().orEmpty()
+            val src = p.observe("src").textOrNull().orEmpty()
             // Images on show are kept before others when there are more than a widget keeps.
             DisposableEffect(inst, src) {
                 inst.imageShown(src, true)
@@ -1124,7 +1121,7 @@ internal fun fontFamily(
     v: Value?,
     inst: WidgetInstance,
 ): FontFamily =
-    when (val name = v?.takeIf { it != Null }?.toString()) {
+    when (val name = v.textOrNull()) {
         null, "mono" -> LauncherStyle.font
         "sans" -> FontFamily.SansSerif
         "serif" -> FontFamily.Serif

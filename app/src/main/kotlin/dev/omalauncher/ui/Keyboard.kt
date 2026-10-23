@@ -81,7 +81,7 @@ class KeyboardBridge(
 
     fun type(text: CharSequence) {
         for (cp in text.codePoints().toArray()) {
-            val mapped = if (cp <= 0xffff) Keys.forChar(cp.toChar()) else null
+            val mapped = if (cp <= 0xffff) KeyNames.forChar(cp.toChar()) else null
             if (mapped == null) {
                 // Not on a US key, like æ, 你 or an emoji: the keymap grows a key for it.
                 if (!Character.isISOControl(cp)) wm.server.postInput { typeCodePoint(cp) }

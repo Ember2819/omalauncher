@@ -15,7 +15,7 @@ import dev.omalauncher.ui.decodeImageIcon
 import dev.omalauncher.ui.decodeSvgIcon
 import dev.omalauncher.upgrade.Versioned
 import dev.omalauncher.upgrade.mapEntries
-import dev.omalauncher.upgrade.writeAtomically
+import dev.omalauncher.upgrade.strings
 import dev.omalauncher.widgets.lang.OwlKind
 import dev.omalauncher.widgets.market.Catalog
 import dev.omalauncher.widgets.market.CatalogEntry
@@ -227,7 +227,7 @@ class Market(
     fun load() {
         if (loaded) return
         loaded = true
-        val data = Versioned.read(record.takeIf { it.exists() }?.readText(), VERSION) as? JSONObject ?: return
+        val data = Versioned.readFile(record, VERSION) ?: return
         installed.putAll(
             data.mapEntries { id, f ->
                 Installed(
@@ -241,8 +241,6 @@ class Market(
         )
     }
 
-    private fun JSONArray.strings() = (0 until length()).map { getString(it) }
-
     private fun save() {
         val data = JSONObject()
         for (i in installed.values) {
@@ -255,7 +253,7 @@ class Market(
                     .put("requires", JSONObject(i.requires.mapValues { JSONArray(it.value) } as Map<*, *>)),
             )
         }
-        runCatching { writeAtomically(record, Versioned.write(VERSION, data).toByteArray()) }
+        runCatching { Versioned.writeFile(record, VERSION, data) }
     }
 }
 
