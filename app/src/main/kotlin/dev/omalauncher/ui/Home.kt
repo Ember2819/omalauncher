@@ -310,8 +310,9 @@ fun HomeScreen(
             // nothing lifted under the status bar. A face typing is the whole screen: it isn't lifted and keeps drawing
             // under the status bar and down to the keyboard.
             .drawWithContent {
-                val keyboard = ime.getBottom(density)
-                if (!terminals.typing || keyboard == 0 || faceTyping) {
+                // Typing first: reading the keyboard's inset would draw this again on each frame it slides, typing or not.
+                val keyboard = if (!terminals.typing || faceTyping) 0 else ime.getBottom(density)
+                if (keyboard == 0) {
                     drawContent()
                 } else {
                     val keys = if (extraKeys) terminals.extraKeysHeight.takeIf { it > 0f } ?: ExtraKeysHeight.toPx() else 0f
