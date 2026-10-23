@@ -216,6 +216,10 @@ fun HomeScreen(
     // Its shell exited, or the app lost focus: the soft keyboard goes too.
     val typing = terminals.active != null
     LaunchedEffect(typing) { if (!typing) terminals.keyboard?.hide() }
+    DisposableEffect(state) {
+        state.onHomeAgain = { if (arrange.folder != null) arrange.folder = null else state.requestedPage = 1 }
+        onDispose { state.onHomeAgain = {} }
+    }
     LaunchedEffect(state.requestedPage) {
         state.requestedPage?.let { slotOf(it).takeIf { i -> i >= 0 }?.let { i -> pager.animateScrollToPage(i) } }
         state.requestedPage = null
