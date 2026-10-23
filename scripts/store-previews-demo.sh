@@ -179,8 +179,16 @@ sqlite3 "$opencode" "
   insert into message (time_created, data)
   select ($now - (i * 37 % 41) * 900 - 60) * 1000,
     json_object('providerID', 'opencode-go', 'role', 'assistant', 'modelID', 'glm-5.3-flash',
-      'tokens', json_object('input', 150000 + i * 3000, 'output', 15000, 'reasoning', 4000,
+      'tokens', json_object('total', 169000 + i * 3000, 'input', 150000 + i * 3000, 'output', 15000, 'reasoning', 4000,
         'cache', json_object('read', 900000, 'write', 0)))
+  from n;
+  -- And a morning on the free tier, which opencode-burn paces (go-limit counts only opencode-go).
+  with recursive n(i) as (select 0 union all select i + 1 from n where i < 49)
+  insert into message (time_created, data)
+  select ($now - (i * 29 % 31) * 600 - 3600) * 1000,
+    json_object('providerID', 'opencode', 'role', 'assistant', 'modelID', 'glm-5.3-flash-free',
+      'tokens', json_object('total', 61000 + i * 1000, 'input', 50000 + i * 1000, 'output', 9000, 'reasoning', 2000,
+        'cache', json_object('read', 300000, 'write', 0)))
   from n"
 
 # Two calendars of made-up events over the next few days, in place of the Google feeds the
