@@ -235,6 +235,11 @@ val LocalLongPressClaim = staticCompositionLocalOf<LongPressClaim?> { null }
 /** Widget text, 13sp as widgets were made for, whatever size the launcher's own text is. */
 internal val WidgetMono get() = Mono.copy(fontSize = 13.sp)
 
+/** Animated widgets' frame rate: on a 120 Hz screen, twice it costs twice the battery for motion that looks the same. */
+private const val WIDGET_FPS = 60
+
+private const val TICK = 1_000_000_000L / WIDGET_FPS
+
 /** The widget's screen { } block, filling [modifier]; `screenWidth` and `screenHeight` follow its size. */
 @Composable
 fun WidgetScreen(
@@ -275,7 +280,8 @@ fun WidgetKeybar(
 /**
  * A frame clock for widgets that read `time`, only while they're on screen ([covered] is false)
  * and something still reads it: a `time` under an `if` that's false, like a backdrop drawn only
- * while music plays, stops it after a few frames, and the next read starts it again.
+ * while music plays, stops it after a few frames, and the next read starts it again. At most
+ * [WIDGET_FPS] frames a second, whatever the screen's rate.
  */
 @Composable
 private fun FrameClock(
@@ -286,6 +292,9 @@ private fun FrameClock(
         val start = withFrameNanos { it }
         var frame = 0L
         var unread = 0
+        // When the next tick is due. A frame up to a quarter of a tick early takes it, so a 60 Hz screen ticks on each
+        // frame, 90 Hz on two in three and 120 Hz on every other one.
+        var due = start
         while (true) {
             if (covered()) snapshotFlow { covered() }.first { !it }
             if (unread >= 3) {
@@ -293,6 +302,9 @@ private fun FrameClock(
                 unread = 0
             }
             withFrameNanos { now ->
+                if (now < due - TICK / 4) return@withFrameNanos
+                // Behind by more than a tick (covered, or a long frame): the next one is a tick from now.
+                due = if (now - due > TICK) now + TICK else due + TICK
                 // Widgets that draw slowly get half the frame rate instead of stalling the home screen.
                 if (inst.slow && frame++ % 2 != 0L) return@withFrameNanos
                 unread = if (inst.timeRead) 0 else unread + 1
