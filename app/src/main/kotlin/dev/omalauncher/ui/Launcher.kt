@@ -72,8 +72,9 @@ fun LauncherRoot(
 ) {
     state.bindScope()
     val ready = runtime.launcherReady
-    // With our live wallpaper active the window is transparent and Android draws the wallpaper behind it.
-    val showOwnBackground = !ready || !runtime.themes.liveWallpaperActive
+    // With our live wallpaper active the window is transparent and Android draws the wallpaper behind it. Home draws its
+    // own over the whole window, so the color under it would only be drawn over.
+    val showOwnBackground = !ready || !runtime.themes.liveWallpaperActive && runtime.themes.wallpaper == null
     Box(
         Modifier
             .fillMaxSize()
@@ -102,8 +103,8 @@ private fun DesktopScreen(
 
     if (!runtime.themes.liveWallpaperActive) {
         runtime.themes.wallpaper?.let { bmp ->
-            // Read while drawing, so swiping pages only redraws this.
-            Canvas(Modifier.fillMaxSize()) {
+            // Read while drawing, and in its own layer, so swiping pages only redraws this.
+            Canvas(Modifier.fillMaxSize().graphicsLayer()) {
                 val src = wallpaperCrop(bmp.width, bmp.height, size.width.toInt(), size.height.toInt(), state.wallpaperOffset)
                 drawImage(
                     bmp,
