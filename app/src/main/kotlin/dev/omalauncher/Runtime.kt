@@ -192,9 +192,11 @@ class Runtime(
                 launcherFiles.sync()
                 agents.load()
             }
+            // Widgets don't wait for the theme: they draw with the palette, which is already loaded, and the
+            // wallpaper decode is the slow part of themes.load().
+            widgets.start()
             themes.load()
             style.start()
-            widgets.start()
             // On the first-run screen the download is the screen's job, with progress.
             if (launcherReady) scope.launch { themes.ensureRelease() }
             if (bootstrap.wanted) runLinux { bootstrap.run() } else bootstrap.run()
