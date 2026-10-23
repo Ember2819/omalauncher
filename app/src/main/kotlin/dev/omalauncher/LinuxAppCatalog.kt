@@ -67,16 +67,14 @@ class LinuxAppCatalog(
         val missing = loaded.filter { it.icon != null && it.id !in icons }
         if (missing.isEmpty()) return
         val size = (52 * context.resources.displayMetrics.density).toInt()
-        val decoded =
-            withContext(Dispatchers.IO) {
-                missing.mapNotNull { app ->
-                    val file = resolveLinuxIcon(proot.rootfs, app.icon!!) ?: return@mapNotNull null
-                    decodeIcon(file, size)?.let { Triple(app, it.asImageBitmap(), bitmapMask(it).asImageBitmap()) }
-                }
-            }
-        for ((app, icon, mask) in decoded) {
-            icons[app.id] = icon
-            masks[app.id] = mask
+        // Each one as it's ready, rather than all once the last is: the recent strip shows as soon as the list is read.
+        for (app in missing) {
+            val decoded =
+                withContext(Dispatchers.IO) {
+                    resolveLinuxIcon(proot.rootfs, app.icon!!)?.let { decodeIcon(it, size) }?.let { it.asImageBitmap() to bitmapMask(it).asImageBitmap() }
+                } ?: continue
+            icons[app.id] = decoded.first
+            masks[app.id] = decoded.second
             iconNames[app.id] = app.icon!!
         }
     }

@@ -151,6 +151,10 @@ class Runtime(
         scope.launch {
             snapshotFlow { style.style[Style.FONT] }.drop(1).collect { launcherFont.apply() }
         }
+        // The recent strip's and home's pinned apps.
+        androidApps.iconsFirst = {
+            usage.recent.take(20).filter { it.startsWith("a:") }.mapTo(HashSet()) { it.substringAfter(':') } + widgets.shortcuts.items.mapNotNull(::androidKeyOf)
+        }
         androidApps.start()
         // Omarchy's Super bindings inside Linux windows; the home screen handles its own (see MainActivity).
         keyboard.onShortcut = { code ->
