@@ -65,10 +65,13 @@ const val MISE_SELF_UPDATE = "{ mise self-update -y || true; }"
  * `mise prune -y`, but deleting the unused versions itself first: under proot, mise can't delete a version
  * with a hard link in it (OpenCode's npm postinstall makes one), stops at "Directory not empty", and leaves
  * 255 MB behind. `mise ls --prunable` keeps versions a running program started from, like prune does.
+ * proot's stand-in for the hard link (`.l2s.*`) can come back while the first `rm -rf` empties the folder, so
+ * it tries up to three times (#196).
  */
 const val MISE_PRUNE =
     "{ mise ls --prunable --json | sed -n 's/.*\"install_path\": \"\\([^\"]*\\)\".*/\\1/p' | " +
-        "while read -r p; do case \"\$p\" in */mise/installs/*) rm -rf \"\$p\" ;; esac; done; mise prune -y; }"
+        "while read -r p; do case \"\$p\" in */mise/installs/*) for i in 1 2 3; do rm -rf \"\$p\" 2>/dev/null && break; done ;; esac; done; " +
+        "mise prune -y; }"
 
 /**
  * Downloads and caches are only needed during installs and upgrades; storage on phones is tight. npm-backed
