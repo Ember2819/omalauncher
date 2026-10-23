@@ -95,11 +95,14 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.transform
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -212,7 +215,13 @@ class WidgetServices(
             else -> throw WidgetError("unknown android source $name")
         }
 
+    /** One flow per source, however many widgets read it: each built its own, so the drawer's list was made once for each. */
+    private val shared = HashMap<String, Flow<Value>?>()
+
     override fun androidUpdates(name: String): Flow<Value>? =
+        shared.getOrPut(name) { updatesOf(name)?.shareIn(scope, SharingStarted.WhileSubscribed(0, 0), replay = 1) }
+
+    private fun updatesOf(name: String): Flow<Value>? =
         when (name) {
             "media" -> media.updates()
             "notifications" -> notifications.updates()
@@ -233,6 +242,8 @@ class WidgetServices(
                     emit(it)
                     delay(DRAWER_EVERY_MS)
                 }
+                // Hundreds of apps, made into values on each change: not on the main thread. All it reads is Compose state.
+                .flowOn(Dispatchers.Default)
             "battery" ->
                 callbackFlow {
                     val receiver =
