@@ -320,6 +320,12 @@ class WidgetEngine(
     ) = layout.setPage(fileName, page)
 
     /**
+     * The user put [item] where it is: an app they pinned, or a widget with a page chosen on the phone (a store add, a
+     * share, a drag). A shipped widget is on its file's own `page:` until then.
+     */
+    fun placedOnPhone(item: HomeItem) = item !is WidgetItem || layout.page(item.key) != null
+
+    /**
      * A widget with no room on its page moves to the next page with room at its size, or a new one after the last. A face
      * left of page 1 whose place is taken goes further left instead, to a new one left of the leftmost. Returns the page.
      */

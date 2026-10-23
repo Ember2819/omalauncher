@@ -438,7 +438,13 @@ fun HomeScreen(
                     }
                 }
             },
-            onNoRoom = { item -> showPage = engine.moveToFreePage(item) },
+            // Home turns to where a tile the user just added went; a shipped one that doesn't fit, as on a short
+            // screen's first home, moves without taking home off page 1.
+            onNoRoom = { item ->
+                val turn = engine.placedOnPhone(item)
+                val page = engine.moveToFreePage(item)
+                if (turn) showPage = page
+            },
             onMove = { item, page ->
                 engine.moveToPage(item, page)
                 showPage = page
