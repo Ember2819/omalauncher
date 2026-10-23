@@ -137,8 +137,13 @@ fun HomeScreen(
     val terminals = runtime.terminals
     BackHandler(enabled = terminals.typing) { terminals.deactivate() }
     BackHandler(enabled = state.homeMenuOpen) { state.homeMenuOpen = false }
-    BackHandler(enabled = state.editing != null && !state.homeMenuOpen) { state.editing = null }
     BackHandler(enabled = arrange.folder != null && !state.homeMenuOpen) { arrange.folder = null }
+    // After the folder's, so back puts down an app selected in it before closing it.
+    BackHandler(enabled = state.editing != null && !state.homeMenuOpen) { state.editing = null }
+    // An app selected in a folder goes with it.
+    LaunchedEffect(arrange.folder) {
+        if (arrange.folder == null && engine.shortcuts.items.any { it.key == state.editing && it.folder != null }) state.editing = null
+    }
     LaunchedEffect(engine) {
         engine.launcherAction = { action ->
             when (action) {

@@ -620,14 +620,33 @@ internal fun HomeGrid(
                         val placed = if (side < shown.size) placedOn(page, g) else emptyList()
 
                         // An open folder takes every touch: a tap on an app opens it (the tile gets the tap),
-                        // a long-press lifts it to sort it in or drag it out, a tap on its name types a new one, a tap outside closes the folder. Its panel is centered on
-                        // the whole screen, even with two pages showing.
+                        // a long-press lifts it to sort it in or drag it out, or let go where it was shows its bar, a tap on its name types a new one,
+                        // a tap outside closes the folder. Its panel is centered on the whole screen, even with two pages showing.
                         val folderPage = shown.getOrNull(sideOf(arrange.folder, shown))
                         val open = folderPage?.let { p -> itemsOn(p).firstOrNull { it.key == arrange.folder } as? Folder }
                         if (open == null) arrange.folder = null
                         if (open != null && folderPage != null) {
                             val fg = FolderGeometry(size.width, g.height, g.cellW, g.cellH, g.gap, open.apps.size, this)
                             val hit = open.apps.indices.firstOrNull { fg.app(it).has(start) }
+                            // With one of its apps selected, as on home: the bar's taps are its buttons', the app drags at once, and any other touch puts it down.
+                            if (open.apps.any { it.key == sel }) {
+                                if (arrange.bar?.has(start) == true) return@awaitEachGesture
+                                down.consume()
+                                if (hit != null && open.apps[hit].key == sel) {
+                                    arrange.holding = true
+                                    val moved =
+                                        try {
+                                            moveDrag(down.id, start, open.apps[hit], Cell(0, 0, 1, 1), folderPage, fg.app(hit), fg)
+                                        } finally {
+                                            arrange.holding = false
+                                        }
+                                    if (moved) onSelect(null)
+                                } else {
+                                    onSelect(null)
+                                    trackUntilUp(down.id)
+                                }
+                                return@awaitEachGesture
+                            }
                             if (hit == null) {
                                 down.consume()
                                 if (!fg.panel.has(start)) arrange.folder = null
@@ -637,11 +656,13 @@ internal fun HomeGrid(
                             if (!awaitLongPress(down.id, start)) return@awaitEachGesture
                             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                             arrange.holding = true
-                            try {
-                                moveDrag(down.id, start, open.apps[hit], Cell(0, 0, 1, 1), folderPage, fg.app(hit), fg)
-                            } finally {
-                                arrange.holding = false
-                            }
+                            val moved =
+                                try {
+                                    moveDrag(down.id, start, open.apps[hit], Cell(0, 0, 1, 1), folderPage, fg.app(hit), fg)
+                                } finally {
+                                    arrange.holding = false
+                                }
+                            if (!moved) onSelect(open.apps[hit].key)
                             return@awaitEachGesture
                         }
 
@@ -754,6 +775,9 @@ internal fun HomeGrid(
                     fg,
                     tile,
                     arrange.carry?.item?.key,
+                    selected = selected.takeIf { !arrange.holding },
+                    actions = actions,
+                    onBar = { arrange.bar = it },
                     naming = arrange.naming,
                     onName = { onRenameFolder(openFolder, it) },
                     onNamed = { arrange.naming = false },
