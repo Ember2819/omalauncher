@@ -14,8 +14,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.withResumed
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
 import dev.omalauncher.ui.Palette
@@ -122,14 +124,23 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch { runtime.themes.refreshLiveWallpaper() }
     }
 
-    /** Drops Recents cards whose Linux window no longer exists (app exited or process restarted). */
+    /**
+     * Drops Recents cards whose Linux window no longer exists (app exited or process restarted). Asking for the tasks
+     * goes through the system for each one, a few ms on the main thread as home comes back: they're listed off it.
+     */
     private fun removeStaleWindowTasks() {
-        for (task in getSystemService(ActivityManager::class.java).appTasks) {
-            val base = runCatching { task.taskInfo?.baseIntent }.getOrNull() ?: continue
-            // By its data rather than its class: windows start through aliases too.
-            if (base.data?.let { it.scheme == "omarchy" && it.host == "window" } != true) continue
+        lifecycleScope.launch {
+            val windows =
+                withContext(Dispatchers.IO) {
+                    getSystemService(ActivityManager::class.java).appTasks.mapNotNull { task ->
+                        val data = runCatching { task.taskInfo?.baseIntent?.data }.getOrNull() ?: return@mapNotNull null
+                        // By its data rather than its class: windows start through aliases too.
+                        if (data.scheme == "omarchy" && data.host == "window") task to data.lastPathSegment else null
+                    }
+                }
+            val stale = windows.filter { (_, handle) -> runtime.wm.windowByHandle(handle) == null }.map { it.first }
             // A window that just closed removes its own task meanwhile; finishing it again throws.
-            if (runtime.wm.windowByHandle(base.data?.lastPathSegment) == null) runCatching { task.finishAndRemoveTask() }
+            if (stale.isNotEmpty()) withContext(Dispatchers.IO) { stale.forEach { runCatching { it.finishAndRemoveTask() } } }
         }
     }
 
