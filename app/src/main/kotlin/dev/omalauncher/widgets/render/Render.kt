@@ -30,7 +30,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.PressGestureScope
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
@@ -140,6 +143,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.max
 import kotlin.math.min
 import dev.omalauncher.widgets.lang.textOrNull
@@ -889,9 +893,14 @@ private fun handlers(
     val haptics = LocalHapticFeedback.current
     val claim = LocalLongPressClaim.current
     if (tap != null || long != null) {
+        // A ripple where it's pressed, unless `ripple: false` (owl 14), for a node that shows its press itself.
+        val presses = remember { MutableInteractionSource() }
+        val ripple = p.observe("ripple")?.truthy != false
+        if (ripple) m = m.ripple(presses, p.float("radius", if (el.kind == "Button" || p.has("border")) 8f * LauncherStyle.cornerScale else 0f))
         m =
-            m.pointerInput(el, p.env, long != null) {
+            m.pointerInput(el, p.env, long != null, ripple) {
                 detectTapGestures(
+                    onPress = { o -> if (ripple) press(presses, o) },
                     onLongPress =
                         long?.let { a ->
                             { o ->
@@ -989,6 +998,24 @@ private fun handlers(
     }
     return m
 }
+
+/**
+ * Tells [presses] of a press at [at] and its end. A touch that turns into a scroll within [PRESS_DELAY_MS] shows
+ * nothing, so a list doesn't flash under the finger; a tap quicker than that still shows the whole press.
+ */
+private suspend fun PressGestureScope.press(
+    presses: MutableInteractionSource,
+    at: Offset,
+) {
+    val early = withTimeoutOrNull(PRESS_DELAY_MS) { tryAwaitRelease() }
+    if (early == false) return
+    val press = PressInteraction.Press(at)
+    presses.emit(press)
+    val released = early ?: tryAwaitRelease()
+    presses.emit(if (released) PressInteraction.Release(press) else PressInteraction.Cancel(press))
+}
+
+private const val PRESS_DELAY_MS = 64L
 
 /**
  * A node with onPress or onRelease and nothing to tap: keys reach it as one that takes taps ([keyFocus]), and Enter

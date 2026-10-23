@@ -46,7 +46,8 @@ Every node also takes:
   keys repeat: `repeat` is 0 for the press and counts up from there; `Slider` and `Input` also take
   `onChange`, and `Input` `onSubmit`, both with `value`; `Popup` takes `onDismiss`. In pages, apps and a widget's `screen { }`,
   `onLongPress` (with `x`, `y`, owl 10); on a tile, long-press belongs to the home screen, which uses it
-  to move and resize tiles. With a keyboard or a gamepad, Tab and the arrows (the D-pad) move between the nodes that
+  to move and resize tiles. A node with `onTap` or `onLongPress` ripples from where it's pressed, within its `radius`;
+  `ripple: false` (owl 14) leaves it still, for one that shows its press itself, as with `onPress`. With a keyboard or a gamepad, Tab and the arrows (the D-pad) move between the nodes that
   have `onTap` or `onLongPress`, ringed in `accent`; Enter, Space or A taps one at its middle, and holding it, or Menu
   (a gamepad's Select), long-presses it. What takes taps inside one that does, like a `[+]` in a tappable row or a
   widget's buttons on its tile, is reached with Right from it, and Left from the first comes back out; Enter on a tile
