@@ -627,6 +627,7 @@ class WidgetEngine(
         // Not at startup, when every file compiles: only what changed while the launcher runs, which is an agent at work.
         if (loaded) changed.forEach(::requestPreview)
         if (!loaded) {
+            runtime.drawOwlIcons(parsed.filter { it.kind == OwlKind.App })
             loaded = true
             // Before faces, page 1 could be emptied by moving its last tile away, and home opens on page 1: the first page
             // of tiles becomes it again.
