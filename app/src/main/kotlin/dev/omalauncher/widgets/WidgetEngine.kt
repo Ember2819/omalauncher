@@ -102,7 +102,11 @@ class WidgetEngine(
     /** `persist` values, launcher-side like the grid layout, so widget files stay the agent's. */
     private val stateDir = File(context.filesDir, "widget-state")
     val specs = mutableStateListOf<WidgetSpec>()
-    private val instances = HashMap<String, WidgetInstance>()
+    /**
+     * Observed: Linux coming up after the first load recomposes a tile that needs it before the reload starts its
+     * instance, and when that reload changes no spec nothing else would draw the tile again.
+     */
+    private val instances = mutableStateMapOf<String, WidgetInstance>()
     val layout = WidgetLayout(context)
     val shortcuts = Shortcuts(context, layout)
 
