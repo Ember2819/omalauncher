@@ -284,9 +284,8 @@ class Runtime(
 
     /** The foreground service keeps the process, and with it Linux, alive; only while Linux is installed or installing. */
     private fun setService(on: Boolean) {
-        val intent = Intent(context, LinuxService::class.java)
         // Android 12+ refuses a foreground service started from the background; the work then goes on without it.
-        if (on) runCatching { context.startForegroundService(intent) }.onFailure { Log.w(TAG, "cannot start the service", it) } else context.stopService(intent)
+        runCatching { LinuxService.set(context, on) }.onFailure { Log.w(TAG, "cannot start the service", it) }
     }
 
     /** Guest configs follow the theme and the installed agents; only while there is a guest. */
