@@ -196,7 +196,8 @@ private fun AppWindow(
                     .onSizeChanged { surfaceView?.visibleHeight = it.height },
             ) {
                 // Over the SurfaceView, which Compose's pointer input doesn't reach.
-                Box(Modifier.fillMaxSize().linuxWindowInput(runtime.wm, window))
+                // A tap on the prompt line brings the keyboard back, as the ⌨ button does.
+                Box(Modifier.fillMaxSize().linuxWindowInput(runtime.wm, window) { sink?.takeUnless { it.showing }?.show() })
                 Box(
                     Modifier
                         .align(Alignment.BottomEnd)

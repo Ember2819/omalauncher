@@ -15,6 +15,8 @@ import android.view.inputmethod.InputMethodManager
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import dev.omalauncher.wayland.Keys
 import dev.omalauncher.widgets.lang.KeyNames
 
@@ -218,6 +220,9 @@ class KeyboardSink(
 
     /** Whether the soft keyboard is wanted: shown by us and not hidden by us since. */
     val wanted get() = softKeyboard
+
+    /** Whether a soft keyboard is on screen now; Back closes it without [hide], so [wanted] can say otherwise. */
+    val showing get() = ViewCompat.getRootWindowInsets(this)?.isVisible(WindowInsetsCompat.Type.ime()) == true
 
     // Focusable only while it has the keyboard: one that always is takes the window's focus on its own, and the keys'
     // arrows then never reach home's tiles.

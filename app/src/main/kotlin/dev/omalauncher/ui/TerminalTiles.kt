@@ -329,7 +329,8 @@ fun TerminalView(
                 }
             active -> {
                 // Over the TextureView, which Compose's pointer input doesn't reach.
-                Box(Modifier.fillMaxSize().linuxWindowInput(tiles.windowManager, window))
+                // A tap on the prompt line brings the keyboard back, as the ⌨ button does.
+                Box(Modifier.fillMaxSize().linuxWindowInput(tiles.windowManager, window) { tiles.keyboard?.takeUnless { it.showing }?.show() })
                 Box(
                     Modifier
                         .align(Alignment.BottomEnd)
