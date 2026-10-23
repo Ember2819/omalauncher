@@ -260,7 +260,8 @@ internal fun RecentStrip(
     home: FocusRequester? = null,
     side: HomeSide? = null,
 ) {
-    val apps = recentApps(runtime, 20)
+    // Not before every kind of app is listed: the ones missing would push in as their kind arrived.
+    val apps = if (runtime.appsListed) recentApps(runtime, 20) else emptyList()
     // Nothing opened yet: no strip, but its room stays, so home doesn't shift when the first app shows up.
     if (apps.isEmpty()) {
         Spacer(if (vertical) modifier.width(RecentStripHeight) else modifier.height(RecentStripHeight))

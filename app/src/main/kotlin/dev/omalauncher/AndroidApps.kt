@@ -224,6 +224,10 @@ class AndroidAppCatalog(
     var listsShortcuts by mutableStateOf(false)
         private set
 
+    /** Whether the apps have been listed once; until then [apps] is empty because nothing was asked yet, not because there are none. */
+    var listed by mutableStateOf(false)
+        private set
+
     /** Icon edge in px: the drawer's 52dp icon at this screen's density. */
     private val iconPx = (52 * context.resources.displayMetrics.density).toInt().coerceAtLeast(48)
 
@@ -542,6 +546,7 @@ class AndroidAppCatalog(
                     shortcuts.clear()
                     shortcuts += pinned
                 }
+                this@AndroidAppCatalog.listed = true
                 val present = (list.map { it.key } + pinned.map { it.key }).toHashSet()
                 icons.keys.retainAll(present)
                 masks.keys.retainAll(present)

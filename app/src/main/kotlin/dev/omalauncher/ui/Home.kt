@@ -1,6 +1,7 @@
 package dev.omalauncher.ui
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -108,10 +109,13 @@ fun HomeScreen(
     // LauncherState.faceShowing), and the status bar's while all of them say statusBar: false.
     fun faceOn(page: Int?) = page?.let { engine.layout.owner(engine.itemsOn(it)) as? WidgetItem }?.takeIf { it.isFace }
     fun full(page: Int?) = page != null && (isFacePage(page) || faceOn(page) != null)
-    val slots = slotsOf(pageNumbers, per, ::full)
+    // No pages until the widgets have loaded: pinned apps load first, and pages shown before them would fill in, then
+    // shift as the widgets' pages joined, with home turning to page 1 among them.
+    val slots = if (engine.loaded) slotsOf(pageNumbers, per, ::full) else emptyList()
     fun slotOf(page: Int) = slots.indexOfFirst { page in it }
     // Home opens on page 1, not left of it; on the first tile page, if a layout from before faces has none numbered 1.
-    val pager = rememberPagerState(initialPage = slotOf(pageNumbers.firstOrNull { it >= 1 } ?: 1).coerceAtLeast(0)) { slots.size }
+    // Made again once the widgets have loaded, so it starts on that page among all of them.
+    val pager = key(engine.loaded) { rememberPagerState(initialPage = slotOf(pageNumbers.firstOrNull { it >= 1 } ?: 1).coerceAtLeast(0)) { slots.size } }
     // A tile dropped on another page: show that page once the page list has caught up, by the list as it is then. The
     // list the request was made with could be one from before (a store add spilling onto page 2 showed a face). A swipe
     // meanwhile wins, and the request goes with it rather than firing later.

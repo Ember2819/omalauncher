@@ -192,6 +192,8 @@ class Runtime(
                 launcherFiles.sync()
                 agents.load()
             }
+            // Linux apps are files on disk: listed now for the recent strip, not after Linux has started.
+            if (bootstrap.wanted) scope.launch { linuxApps.refresh() } else linuxApps.listed = true
             // Widgets don't wait for the theme: they draw with the palette, which is already loaded, and the
             // wallpaper decode is the slow part of themes.load().
             widgets.start()
@@ -401,6 +403,9 @@ class Runtime(
         screens = (screens - 1).coerceAtLeast(0)
         if (screens == 0) proot.procShim.setActive(false)
     }
+
+    /** Whether every kind of app has been listed once: Android's, Linux's and owl's. Before, a list of them would be missing some. */
+    val appsListed get() = androidApps.listed && linuxApps.listed && widgets.loaded
 
     /** Rescans .desktop entries; see [LinuxAppCatalog.refresh]. */
     suspend fun refreshApps() {
