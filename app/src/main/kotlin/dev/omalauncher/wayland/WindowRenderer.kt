@@ -41,7 +41,13 @@ class WindowRenderer(
     private val window: XdgToplevel,
     /** Keeps the window's alpha, for a view that isn't opaque to show what's behind it; else it's filled with [background]. */
     private val translucent: Boolean = false,
+    /** At most this many frames a second, whatever the screen's rate; 0 for every vsync. */
+    maxFps: Int = 0,
 ) {
+    /** The least time between frames, less a quarter so a frame a little early still takes its vsync. */
+    private val minInterval = if (maxFps > 0) 1_000_000_000L / maxFps * 3 / 4 else 0L
+    private var lastFrame = 0L
+
     private val thread = HandlerThread("wl-render").apply { start() }
     private val handler = Handler(thread.looper)
     private var choreographer: Choreographer? = null
@@ -117,6 +123,12 @@ class WindowRenderer(
     }
 
     private fun frame(nanos: Long) {
+        // Too soon after the last: the next vsync, still requested, and the clients wait for it too.
+        if (nanos - lastFrame < minInterval) {
+            choreographer?.postFrameCallback(callback)
+            return
+        }
+        lastFrame = nanos
         frameRequested.set(false)
         lock.withLock {
             if (native == 0L) return
