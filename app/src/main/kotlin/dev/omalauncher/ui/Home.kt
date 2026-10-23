@@ -19,6 +19,7 @@ import dev.omalauncher.widgets.HomeItem
 import dev.omalauncher.widgets.Shortcut
 import dev.omalauncher.widgets.WidgetItem
 import dev.omalauncher.widgets.WidgetSpec
+import dev.omalauncher.widgets.app
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -85,14 +86,6 @@ import dev.omalauncher.widgets.render.LocalHomeTiles
 import dev.omalauncher.widgets.editWidgetCommand
 import dev.omalauncher.widgets.fixDependenciesCommand
 import dev.omalauncher.widgets.newOwlCommand
-
-/** The file home's edit bar edits: a widget's own spec, or the owl app a pinned shortcut names; null for anything else or a missing app. */
-internal fun homeEditSpec(item: HomeItem, specs: List<WidgetSpec>): WidgetSpec? =
-    when (item) {
-        is WidgetItem -> item.spec
-        is Shortcut -> item.owl?.let { file -> specs.firstOrNull { it.kind == OwlKind.App && it.file.name == file } }
-        else -> null
-    }
 
 /** Home pages of JSON widgets on a snap grid, bordered and gapped like Omarchy windows. */
 @Composable
@@ -407,7 +400,8 @@ fun HomeScreen(
                         Spacer(Modifier.height(6.dp))
                     }
                     EditBar {
-                        val spec = homeEditSpec(item, engine.specs)
+                        // A widget's own file, or the owl app a pinned shortcut opens.
+                        val spec = if (item is WidgetItem) item.spec else (item as? Shortcut)?.owl?.let(engine.specs::app)
                         if (spec != null) EditAction("edit") { edit(spec) }
                         // As a QR code or link, or (your own) to the store. An agent's tile is a terminal, not a widget to pass on.
                         if (item is WidgetItem && !engine.isAgentWidget(item.spec)) {

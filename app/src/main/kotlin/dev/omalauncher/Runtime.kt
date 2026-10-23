@@ -56,6 +56,7 @@ import dev.omalauncher.wayland.XdgToplevel
 import dev.omalauncher.widgets.Shortcut
 import dev.omalauncher.widgets.WidgetEngine
 import dev.omalauncher.widgets.WidgetSpec
+import dev.omalauncher.widgets.app
 import dev.omalauncher.widgets.lang.Program
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -426,7 +427,7 @@ class Runtime(
         mono: Boolean,
     ): ImageBitmap? {
         androidKeyOf(shortcut)?.let { return if (mono) androidApps.masks[it] else androidApps.icons[it] }
-        shortcut.owl?.let { file -> return widgets.specs.firstOrNull { it.file.name == file }?.let { owlIcon(it, mono) } }
+        shortcut.owl?.let { file -> return widgets.specs.app(file)?.let { owlIcon(it, mono) } }
         val id = shortcut.linux?.id ?: return null
         return if (mono) linuxApps.masks[id] else linuxApps.icons[id]
     }
@@ -492,7 +493,7 @@ class Runtime(
      */
     fun shortcutLabel(shortcut: Shortcut) =
         androidKeyOf(shortcut)?.let { androidApps.labels[it] }
-            ?: shortcut.owl?.let { file -> widgets.specs.firstOrNull { it.file.name == file }?.name }
+            ?: shortcut.owl?.let { widgets.specs.app(it)?.name }
             ?: shortcut.label
 
     /** A pinned Android app's or shortcut's key in [androidApps]; null for a Linux app. */

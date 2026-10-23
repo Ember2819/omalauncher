@@ -72,6 +72,9 @@ class WidgetSpec(
     fun onPage(page: Int) = WidgetSpec(file, name, page, order, program, error, size, minSize, stamp, kind)
 }
 
+/** The owl app in file [file], as a pinned shortcut names it; null once it's gone or no longer an app. */
+fun List<WidgetSpec>.app(file: String) = firstOrNull { it.file.name == file && it.kind == OwlKind.App }
+
 /**
  * Loads widgets (`*.owl`) from [dir], ~/.config/omalauncher/widgets in the guest,
  * reloads files as they change, and runs each widget's sources while its
@@ -235,7 +238,7 @@ class WidgetEngine(
 
     /** A running app with its spec, for its activity; null once it's removed or stops compiling. */
     fun appInstance(name: String): Pair<WidgetSpec, WidgetInstance>? {
-        val spec = specs.firstOrNull { it.file.name == name && it.kind == OwlKind.App } ?: return null
+        val spec = specs.app(name) ?: return null
         return instances[name]?.takeIf { it.program.kind == OwlKind.App }?.let { spec to it }
     }
 
