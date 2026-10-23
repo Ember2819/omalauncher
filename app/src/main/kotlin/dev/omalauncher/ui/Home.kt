@@ -406,81 +406,9 @@ fun HomeScreen(
                     }
                 }
             },
-            render = { item, placed, selected ->
-                val open: () -> Unit =
-                    when (item) {
-                        is WidgetItem -> { -> engine.tap(item.spec) }
-                        // Opening an app from a folder closes the folder, like Android.
-                        is Shortcut -> { ->
-                            arrange.folder = null
-                            runtime.open(item)
-                        }
-                        is Folder -> { -> arrange.folder = item.key }
-                    }
-                // Keys reach a tile as a finger does: Enter opens it, and Menu or holding Enter selects it, as a long press.
-                // What takes taps in a widget is inside it, Right away; Enter goes there too on one with no tap of its own.
-                // It shows as the tile's own focus.
-                var keyed by remember(item.key) { mutableStateOf(false) }
-                val inside = remember(item.key) { FocusRequester() }
-                val keyOpen: () -> Unit = if (item is WidgetItem && item.spec.program?.onTap == null) { { inside.requestFocus() } } else open
-                // Keys on a tile as it's removed, or as its page goes, go to the first tile of the page that shows.
-                val tile = placed.passesKeys(state.homeEntry).keyActivated(keyOpen, { state.editing = item.key }, inside) { keyed = it.hasFocus }
-                val highlighted = selected || keyed
-                when (item) {
-                    is WidgetItem -> {
-                        // Whose terminal has the keyboard: the tile gives up what the keyboard covers once the lift is spent.
-                        val instance = engine.instance(item.spec)
-                        val typing = instance != null && (instance.owns(terminals.active) || terminals.field?.widget === instance)
-                        WidgetTile(
-                            spec = item.spec,
-                            instance = engine.instance(item.spec),
-                            // As shown: on its side in landscape. A face is the whole grid.
-                            cells = (if (item.isFace) engine.layout.grid else engine.layout.cell(item.key)?.let { it.w to it.h })?.let { (w, h) -> if (turned) h to w else w to h },
-                            // Accent like Hyprland's active border: only while one of its terminals has the keyboard. A face
-                            // has none, being the whole screen; its screenInset grows by what the keyboard covers instead.
-                            focused = highlighted || (typing && !item.isFace),
-                            keyboard = if (typing && item.isFace) terminals.cut else 0f,
-                            modifier =
-                                if (typing && item.isFace) {
-                                    tile.onGloballyPositioned { terminals.tile = it.boundsInWindow().translate(0f, terminals.lift) }
-                                } else if (typing) {
-                                    tile
-                                        .onGloballyPositioned { terminals.tile = it.boundsInWindow().translate(0f, terminals.lift) }
-                                        .padding(bottom = with(density) { terminals.cut.toDp() })
-                                } else {
-                                    tile
-                                },
-                            onTap = open,
-                            needs = engine.missing[item.spec.file.name].orEmpty(),
-                            install = engine.installs[item.spec.file.name],
-                            onInstall = { engine.installDependencies(item.spec) },
-                            waitsForLinux = if (engine.waitsForLinux(item.spec)) linuxState else null,
-                            onInstallLinux = { state.show(SettingsPage.Linux) },
-                            onFix = { log -> state.withAgent(runtime, "Fix ${item.spec.name}") { fixDependenciesCommand(it, item.spec, log) } },
-                        )
-                    }
-                    is Shortcut ->
-                        ShortcutTile(
-                            shortcut = item,
-                            label = runtime.shortcutLabel(item),
-                            icon = runtime.shortcutIcon(item, LauncherStyle.monochromeIcons),
-                            focused = highlighted,
-                            modifier = tile,
-                            onTap = open,
-                            paused = runtime.androidApps.paused(item.profile),
-                            clone = runtime.androidApps.cloned(item.profile),
-                        )
-                    is Folder ->
-                        FolderTile(
-                            folder = item,
-                            icons = item.apps.take(4).map { runtime.shortcutIcon(it, LauncherStyle.monochromeIcons) },
-                            labels = item.apps.take(4).map { runtime.shortcutLabel(it) },
-                            focused = highlighted,
-                            modifier = tile,
-                            onTap = open,
-                        )
-                }
-            },
+            // A function of its own, which skips when its tile didn't change: a lambda's body here would run again for
+            // every tile each time home recomposes, as on each page turn.
+            render = { item, placed, selected -> HomeTile(item, placed, selected, runtime, state, arrange, turned, linuxState) },
             // The recent apps strip's room: kept while it's empty, so tiles don't reflow when it fills, and still
             // home's to swipe and long-press there until it does.
             room = if (LauncherStyle.recentApps && side == null) RecentStripHeight else 0.dp,
@@ -609,5 +537,96 @@ internal fun barShift(
         // Coming from a face on the left: the bar comes in from the right with the tile page.
         !rightFull -> 1f - f
         else -> 1f
+    }
+}
+
+/** A tile on home: a widget, a pinned app or a folder, [selected] for editing, at [placed]. */
+@Composable
+private fun HomeTile(
+    item: HomeItem,
+    placed: Modifier,
+    selected: Boolean,
+    runtime: Runtime,
+    state: LauncherState,
+    arrange: Arrange,
+    /** As homeTurned(): cells are shown on their side. */
+    turned: Boolean,
+    linuxState: LinuxState,
+) {
+    val engine = runtime.widgets
+    val terminals = runtime.terminals
+    val density = LocalDensity.current
+    val open: () -> Unit =
+        when (item) {
+            is WidgetItem -> { -> engine.tap(item.spec) }
+            // Opening an app from a folder closes the folder, like Android.
+            is Shortcut -> { ->
+                arrange.folder = null
+                runtime.open(item)
+            }
+            is Folder -> { -> arrange.folder = item.key }
+        }
+    // Keys reach a tile as a finger does: Enter opens it, and Menu or holding Enter selects it, as a long press.
+    // What takes taps in a widget is inside it, Right away; Enter goes there too on one with no tap of its own.
+    // It shows as the tile's own focus.
+    var keyed by remember(item.key) { mutableStateOf(false) }
+    val inside = remember(item.key) { FocusRequester() }
+    val keyOpen: () -> Unit = if (item is WidgetItem && item.spec.program?.onTap == null) { { inside.requestFocus() } } else open
+    // Keys on a tile as it's removed, or as its page goes, go to the first tile of the page that shows.
+    val tile = placed.passesKeys(state.homeEntry).keyActivated(keyOpen, { state.editing = item.key }, inside) { keyed = it.hasFocus }
+    val highlighted = selected || keyed
+    when (item) {
+        is WidgetItem -> {
+            // Whose terminal has the keyboard: the tile gives up what the keyboard covers once the lift is spent.
+            val instance = engine.instance(item.spec)
+            val typing = instance != null && (instance.owns(terminals.active) || terminals.field?.widget === instance)
+            WidgetTile(
+                spec = item.spec,
+                instance = engine.instance(item.spec),
+                // As shown: on its side in landscape. A face is the whole grid.
+                cells = (if (item.isFace) engine.layout.grid else engine.layout.cell(item.key)?.let { it.w to it.h })?.let { (w, h) -> if (turned) h to w else w to h },
+                // Accent like Hyprland's active border: only while one of its terminals has the keyboard. A face
+                // has none, being the whole screen; its screenInset grows by what the keyboard covers instead.
+                focused = highlighted || (typing && !item.isFace),
+                keyboard = if (typing && item.isFace) terminals.cut else 0f,
+                modifier =
+                    if (typing && item.isFace) {
+                        tile.onGloballyPositioned { terminals.tile = it.boundsInWindow().translate(0f, terminals.lift) }
+                    } else if (typing) {
+                        tile
+                            .onGloballyPositioned { terminals.tile = it.boundsInWindow().translate(0f, terminals.lift) }
+                            .padding(bottom = with(density) { terminals.cut.toDp() })
+                    } else {
+                        tile
+                    },
+                onTap = open,
+                needs = engine.missing[item.spec.file.name].orEmpty(),
+                install = engine.installs[item.spec.file.name],
+                onInstall = { engine.installDependencies(item.spec) },
+                waitsForLinux = if (engine.waitsForLinux(item.spec)) linuxState else null,
+                onInstallLinux = { state.show(SettingsPage.Linux) },
+                onFix = { log -> state.withAgent(runtime, "Fix ${item.spec.name}") { fixDependenciesCommand(it, item.spec, log) } },
+            )
+        }
+        is Shortcut ->
+            ShortcutTile(
+                shortcut = item,
+                label = runtime.shortcutLabel(item),
+                icon = runtime.shortcutIcon(item, LauncherStyle.monochromeIcons),
+                focused = highlighted,
+                modifier = tile,
+                onTap = open,
+                paused = runtime.androidApps.paused(item.profile),
+                clone = runtime.androidApps.cloned(item.profile),
+            )
+        is Folder ->
+            FolderTile(
+                folder = item,
+                icons = item.apps.take(4).map { runtime.shortcutIcon(it, LauncherStyle.monochromeIcons) },
+                labels = item.apps.take(4).map { runtime.shortcutLabel(it) },
+                focused = highlighted,
+                modifier = tile,
+                onTap = open,
+            )
     }
 }
