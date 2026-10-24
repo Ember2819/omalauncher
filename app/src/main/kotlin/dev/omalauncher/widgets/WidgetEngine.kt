@@ -1057,7 +1057,9 @@ class WidgetEngine(
         const val GUEST_DIR = ".config/omalauncher/widgets"
 
         private const val AGENT_POINTER =
-            "# omalauncher\n\nThis Arch system runs inside an Android launcher. Home-screen widgets are `.owl` files in " +
+            "# omalauncher\n\nThis Arch system runs inside an Android launcher, omalauncher; its source is at " +
+                "https://github.com/SimonSchubert/omalauncher, should you need to understand how the launcher works. " +
+                "Home-screen widgets are `.owl` files in " +
                 "~/$GUEST_DIR, written in a small declarative language documented in README.md there (and docs/ next to it); so are apps for the " +
                 "app drawer (`app \"name\" { }`) and panels that swiping up or down on home opens (`panel \"name\" { }`, picked with " +
                 "gestures.swipe-up and gestures.swipe-down in ~/${StyleStore.GUEST_DIR}/style.toml). The app drawer is the panel " +
