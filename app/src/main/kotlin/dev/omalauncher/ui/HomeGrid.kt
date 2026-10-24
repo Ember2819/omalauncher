@@ -62,6 +62,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
@@ -348,11 +349,15 @@ internal fun HomeGrid(
     // Each tile's composition, by its key, moves to wherever the tile is drawn: lifted, it goes above the pager and back
     // keeping its state, rather than being made anew each way (a terminal tile its view).
     val latestRender by rememberUpdatedState(render)
-    val tiles = remember { HashMap<String, @Composable (HomeItem, Modifier, Boolean) -> Unit>() }
+    val tiles = remember { HashMap<String, MovableTile>() }
     val tile: @Composable (HomeItem, Modifier, Boolean) -> Unit =
         remember {
             { item, modifier, selected ->
-                tiles.getOrPut(item.key) { movableContentOf { i: HomeItem, m: Modifier, s: Boolean -> latestRender(i, m, s) } }(item, modifier, selected)
+                // A tile whose page the pager set aside is made anew: moved, it brought its deactivated nodes along and
+                // crashed measuring or updating them (Play, 0.12.1).
+                val held = tiles[item.key]?.takeUnless { it.setAside }
+                val t = held ?: MovableTile { t, i, m, s -> latestRender(i, m.then(TileAttached(t)), s) }.also { tiles[item.key] = it }
+                t.content(item, modifier, selected)
             }
         }
     // Gone from home, their compositions go too.
@@ -983,4 +988,33 @@ private fun TiledPage(
             }
         }
     }
+}
+
+/**
+ * A home tile's composition, which moves to wherever the tile is drawn. The pager keeps pages it scrolled away from for
+ * reuse with their nodes deactivated, which detaches the tile's modifier node: such a tile is [setAside].
+ */
+private class MovableTile(
+    render: @Composable (MovableTile, HomeItem, Modifier, Boolean) -> Unit,
+) {
+    val content = movableContentOf { item: HomeItem, modifier: Modifier, selected: Boolean -> render(this, item, modifier, selected) }
+
+    /** The node [TileAttached] put on the tile; null until it's first drawn. */
+    var node: Modifier.Node? = null
+
+    val setAside get() = node?.isAttached == false
+}
+
+private class TileAttached(
+    private val tile: MovableTile,
+) : ModifierNodeElement<Modifier.Node>() {
+    override fun create() = object : Modifier.Node() {}.also { tile.node = it }
+
+    override fun update(node: Modifier.Node) {
+        tile.node = node
+    }
+
+    override fun equals(other: Any?) = other is TileAttached && other.tile === tile
+
+    override fun hashCode() = System.identityHashCode(tile)
 }
