@@ -4,6 +4,29 @@ The most important changes in each release. The Play Store notes for a release
 are in `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt`.
 Dates are when the build was uploaded to Play.
 
+## 0.12.1 (versionCode 22) – 2026-10-24
+
+- Owl apps, panels, faces and screens ripple where they're pressed; a widget's tile
+  on home and the key bar don't.
+- Home's bar on a pinned owl app offers edit and share, as the drawer does (#197),
+  and an app in a folder gets home's bar on a long press.
+- A tap on a terminal's prompt line brings the soft keyboard back (#100). Pressing
+  Home on home with nothing open goes back to page 1 (#201).
+- Faster and lighter: home has its widgets in about half the time after start and
+  shows complete rather than filling in; pages either side are made ahead; animated
+  widgets, terminal tiles and Linux app windows draw at most 60 frames a second, and
+  a terminal tile stops drawing while home is out of sight; the drawer's app list,
+  owl apps' icons and the media source work off the main thread.
+- Linux setup stops with an error naming the kernel fix on custom ROM kernels where
+  it hung at "Initializing pacman keyring" (#105), and setup failing at once (too
+  little space) no longer crashes the launcher.
+- Fixes: Shift on a hardware keyboard with FlorisBoard in terminals and Linux windows;
+  the home terminal tile stuck on its red file name after a relaunch; the first home
+  after onboarding opened on page 2 on short screens; the today tile labelled cached
+  forecast days wrong after midnight; android.battery said "on battery" when plugged
+  in but not charging; system updates printed "Directory not empty" removing an old
+  agent version (#196).
+
 ## 0.12.0 (versionCode 21) – 2026-10-23
 
 - controls.owl, a control center for swiping down on home: the phone's switches,
