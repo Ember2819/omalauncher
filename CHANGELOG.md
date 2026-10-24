@@ -4,6 +4,16 @@ The most important changes in each release. The Play Store notes for a release
 are in `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt`.
 Dates are when the build was uploaded to Play.
 
+## 0.12.2 (versionCode 23) – 2026-10-25
+
+- A store update no longer throws away changes made to a widget, app or face:
+  settings' update leaves an edited one out and lists it as edited, and its store
+  page says updating replaces the changes, as "update anyway" (a Play review).
+- Home no longer crashes measuring or updating a tile on a page the pager had set
+  aside ("measure/Apply is called on deactivated node", Play, 0.12.1).
+- Animated Canvases draw about twice as fast.
+- AGENTS.md and CLAUDE.md in the Linux home folder link the launcher's source.
+
 ## 0.12.1 (versionCode 22) – 2026-10-24
 
 - Owl apps, panels, faces and screens ripple where they're pressed; a widget's tile
