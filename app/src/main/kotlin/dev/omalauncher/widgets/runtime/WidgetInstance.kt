@@ -336,7 +336,12 @@ class WidgetInstance(
             else -> Palette.named(name)
         }?.toArgb()
 
+    /** How many times drawing code has read `time`, so a Canvas can tell which of its ops did. */
+    var timeReads = 0L
+        private set
+
     override fun time(): Double {
+        timeReads++
         if (!timeRead) {
             timeRead = true
             timeWake.trySend(Unit)
