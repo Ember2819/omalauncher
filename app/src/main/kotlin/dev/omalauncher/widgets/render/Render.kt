@@ -197,7 +197,7 @@ fun WidgetContent(
             .then(if (insets != null) Modifier.windowInsetsPadding(insets) else Modifier)
             .padding(inset(program.padding)),
     ) {
-        CompositionLocalProvider(LocalLongPress provides program.isFace) {
+        CompositionLocalProvider(LocalLongPress provides program.isFace, LocalRipple provides program.isFace) {
             Nodes(program.root, inst.root, inst, this)
         }
     }
@@ -205,6 +205,9 @@ fun WidgetContent(
 
 /** Whether nodes here take long presses: in screens, apps and faces, not on a tile, where the home screen has them. */
 val LocalLongPress = staticCompositionLocalOf { false }
+
+/** Whether nodes that take taps ripple: in screens, apps, panels and faces, not on a widget's tile or in a key bar. */
+private val LocalRipple = staticCompositionLocalOf { false }
 
 /** Whether the Column around these nodes is as wide as its content, so its Texts are as wide as their text (see [columnHugs]). */
 private val LocalHug = staticCompositionLocalOf { false }
@@ -250,20 +253,21 @@ private const val TICK = 1_000_000_000L / WIDGET_FPS
 fun WidgetScreen(
     inst: WidgetInstance,
     modifier: Modifier = Modifier,
-) = ScreenNodes(inst, modifier, Modifier.fillMaxSize())
+) = ScreenNodes(inst, modifier, Modifier.fillMaxSize(), ripple = true)
 
 /** Extra keys (`keybar "…" { }`): their nodes over the soft keyboard, as wide as there's room for and as tall as they are. */
 @Composable
 fun WidgetKeybar(
     inst: WidgetInstance,
     modifier: Modifier = Modifier,
-) = ScreenNodes(inst, modifier, Modifier.fillMaxWidth())
+) = ScreenNodes(inst, modifier, Modifier.fillMaxWidth(), ripple = false)
 
 @Composable
 private fun ScreenNodes(
     inst: WidgetInstance,
     modifier: Modifier,
     column: Modifier,
+    ripple: Boolean,
 ) {
     val nodes = inst.program.screen ?: return
     if (inst.program.animated) FrameClock(inst) { false }
@@ -271,7 +275,7 @@ private fun ScreenNodes(
         // Set before the nodes compose, so the first frame already has the size instead of null.
         inst.setScreen(maxWidth.value.toDouble(), maxHeight.value.toDouble())
         Column(column) {
-            CompositionLocalProvider(LocalLongPress provides true) {
+            CompositionLocalProvider(LocalLongPress provides true, LocalRipple provides ripple) {
                 Nodes(nodes, inst.root, inst, this)
             }
         }
@@ -893,9 +897,9 @@ private fun handlers(
     val haptics = LocalHapticFeedback.current
     val claim = LocalLongPressClaim.current
     if (tap != null || long != null) {
-        // A ripple where it's pressed, unless `ripple: false` (owl 14), for a node that shows its press itself.
+        // A ripple where it's pressed, except on a widget's tile and in a key bar.
         val presses = remember { MutableInteractionSource() }
-        val ripple = p.observe("ripple")?.truthy != false
+        val ripple = LocalRipple.current
         if (ripple) m = m.ripple(presses, p.float("radius", if (el.kind == "Button" || p.has("border")) 8f * LauncherStyle.cornerScale else 0f))
         m =
             m.pointerInput(el, p.env, long != null, ripple) {
