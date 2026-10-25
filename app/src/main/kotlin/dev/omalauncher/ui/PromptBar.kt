@@ -213,7 +213,8 @@ internal fun PromptBar(
         if (panelShown && !speech.listening) {
             focus.requestFocus()
             val wants = runtime.widgets.drawerPanel()?.let { runtime.widgets.panelInstance(it)?.second }?.panelKeyboard() ?: runtime.gestures.drawerKeyboard
-            if (wants) keyboard?.show()
+            // Focusing a text field can bring the soft keyboard up by itself; down means down.
+            if (wants) keyboard?.show() else keyboard?.hide()
         } else if (!panelShown && focused) {
             focusManager.clearFocus()
             keyboard?.hide()
