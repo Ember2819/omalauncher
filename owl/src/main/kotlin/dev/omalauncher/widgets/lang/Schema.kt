@@ -144,7 +144,9 @@ internal val SINCE =
         // offsets that ease back when a drag lets go; the torch dimmed.
         listOf("android.sim", "dnd", "notification(\"snooze\")", "notification(\"snoozeAll\")", "notification(\"unsnooze\")", "notification(\"unsnoozeAll\")", ANIMATE_OFFSET, TORCH_LEVEL).associateWith { 13 } +
         // owl 13: the glass home's tiles have, for a face's or a widget's own windows.
-        listOf("tileOpacity", "tileFrost").associateWith { 13 }
+        listOf("tileOpacity", "tileFrost").associateWith { 13 } +
+        // owl 14: whether the launcher raises the keyboard as a panel opens.
+        listOf(PANEL_KEYBOARD).associateWith { 14 }
 
 /** `animate offset: ...`, named like this in [SINCE]. */
 internal const val ANIMATE_OFFSET = "animate offset"
@@ -173,6 +175,9 @@ internal const val PANEL_FILE = "panel \"…\" { }"
 
 /** A panel's own `opacity:`, named like this in [SINCE]. */
 internal const val PANEL_OPACITY = "panel opacity"
+
+/** A panel's `keyboard:`, named like this in [SINCE]. */
+internal const val PANEL_KEYBOARD = "panel keyboard"
 
 internal const val KEYBAR_FILE = "keybar \"…\" { }"
 

@@ -207,11 +207,13 @@ internal fun PromptBar(
         state.promptRequest = null
     }
     // The panel and the bar open and close together: opening it (Super+D, a widget) focuses the bar, closing it lets go.
+    // Opened to dictate, the keyboard stays down; so does a panel that asks to (`keyboard: false`): a tap on the
+    // bar, or the first thing typed, raises it again.
     LaunchedEffect(panelShown) {
-        // Opened to dictate, the keyboard stays down.
         if (panelShown && !speech.listening) {
             focus.requestFocus()
-            keyboard?.show()
+            val wants = runtime.widgets.drawerPanel()?.let { runtime.widgets.panelInstance(it)?.second }?.panelKeyboard() ?: true
+            if (wants) keyboard?.show()
         } else if (!panelShown && focused) {
             focusManager.clearFocus()
             keyboard?.hide()

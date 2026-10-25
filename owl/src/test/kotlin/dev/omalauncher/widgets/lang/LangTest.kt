@@ -1038,6 +1038,16 @@ class LangTest {
         assertTrue(compileError("widget {\n meta { owl: 13 }\n opacity: 0.9\n Text { text: 1 } }").isNotEmpty())
     }
 
+    @Test fun aPanelCanKeepTheKeyboardDown() {
+        // True unless the panel says otherwise; worked out when it opens, like the rest of it.
+        assertNull(Compiler.compile("panel {\n meta { owl: 11 }\n Text { text: 1 } }").keyboard)
+        assertNotNull(Compiler.compile("panel {\n meta { owl: 14 }\n keyboard: false\n Text { text: 1 } }").keyboard)
+        assertNotNull(Compiler.compile("panel {\n meta { owl: 14 }\n state pick = 0\n keyboard: pick > 0\n Text { text: pick } }").keyboard)
+        assertTrue(compileError("panel {\n meta { owl: 13 }\n keyboard: false\n Text { text: 1 } }").contains("needs owl 14"))
+        assertTrue(compileError("widget {\n meta { owl: 14 }\n keyboard: false\n Text { text: 1 } }").isNotEmpty())
+        assertTrue(compileError("keybar {\n meta { owl: 14 }\n keyboard: false\n Box { } }").contains("takes no properties"))
+    }
+
     @Test fun extraKeysAreAFileOfTheirOwn() {
         val p =
             Compiler.compile(
